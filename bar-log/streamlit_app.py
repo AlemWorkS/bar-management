@@ -58,6 +58,17 @@ def apply_theme():
           padding-bottom: 28px;
         }
 
+        /* Inputs desactives lisibles */
+        input:disabled,
+        textarea:disabled,
+        select:disabled,
+        [data-testid="stNumberInput"] input:disabled,
+        [data-testid="stTextInput"] input:disabled {
+          color: var(--text) !important;
+          -webkit-text-fill-color: var(--text) !important;
+          opacity: 1 !important;
+        }
+
         /* Sidebar */
         section[data-testid="stSidebar"] {
           background: #f1f3f8;
@@ -1296,272 +1307,201 @@ def render_entries():
 
 
 def render_sales():
-    render_page_title("Ventes", "Suivi des sorties")
+    st.markdown("## Ventes du jour")
+    st.caption("Suivi des sorties")
     products_df = list_products()
     categories_df = list_categories()
 
     if "receipt_items" not in st.session_state:
         st.session_state["receipt_items"] = []
-    if "receipt_context" not in st.session_state:
-        st.session_state["receipt_context"] = None
 
     if st.session_state.get("sale_reset"):
-        keep_receipt = st.session_state.pop("sale_keep_receipt", False)
-        receipt_context = st.session_state.get("receipt_context")
-        if keep_receipt and receipt_context and receipt_context.get("label"):
-            st.session_state["sale_receipt"] = receipt_context["label"]
-        else:
-            st.session_state["sale_receipt"] = "Nouveau recu"
         st.session_state["sale_product"] = None
-        st.session_state["sale_type"] = "Produit stockable"
         st.session_state["sale_quantite"] = 1
-        st.session_state["sale_date"] = date.today()
+        st.session_state["sale_unit_price"] = 0.0
         st.session_state["sale_unite"] = "bouteille"
-        st.session_state["sale_client"] = ""
-        st.session_state["sale_category"] = None
-        st.session_state["sale_nom_preparation"] = ""
-        st.session_state["sale_prix_vente"] = 0.0
+        st.session_state["sale_unite_display"] = "bouteille"
         st.session_state["sale_reset"] = False
 
-    if not categories_df.empty:
-        type_options = ["Produit stockable", "Cocktail / Mocktail"]
-        product_map = build_product_map(products_df) if not products_df.empty else {}
-
-        receipt_df = list_receipts()
-        receipt_map = {}
-        receipt_options = ["Nouveau recu"]
-        if not receipt_df.empty:
-            for row in receipt_df.to_dict("records"):
-                label = f"Recu #{row['id_recu']} - {row['date_recu']}"
-                if row.get("nom_client"):
-                    label += f" ({row['nom_client']})"
-                receipt_map[label] = row["id_recu"]
-                receipt_options.append(label)
-
-        selected_receipt = st.selectbox("Recu", receipt_options, key="sale_receipt")
-        nom_client = None
-        if selected_receipt == "Nouveau recu":
-            nom_client = st.text_input("Nom client (optionnel)", key="sale_client")
-
-        type_vente = st.selectbox("Type de vente", type_options, key="sale_type")
-
-        with st.form("add_sale", clear_on_submit=True):
-            selected_product = None
-            selected_key = None
-            if type_vente == "Cocktail / Mocktail":
-                st.session_state["sale_product"] = None
-            else:
-                if products_df.empty:
-                    st.info("Ajoutez un produit avant de saisir une vente")
-                else:
-                    selected_key = st.selectbox(
-                        "Produit (recherche)",
-                        list(product_map.keys()),
-                        index=None,
-                        placeholder="Selectionner ou rechercher le nom du produit",
-                        key="sale_product",
-                    )
-                    if selected_key:
-                        selected_product = product_map[selected_key]
-                        if selected_product.get("unite_vente"):
-                            if (
-                                st.session_state.get("sale_unite")
-                                != selected_product["unite_vente"]
-                            ):
-                                st.session_state["sale_unite"] = selected_product[
-                                    "unite_vente"
-                                ]
-                        prix_bouteille = float(
-                            selected_product.get("prix_vente_bouteille") or 0
-                        )
-                        prix_verre = float(
-                            selected_product.get("prix_vente_verre") or 0
-                        )
-                        st.caption(
-                            f"Categorie: {selected_product['categorie']} | "
-                            f"Stock actuel: {selected_product['stock_actuel']} | "
-                            f"Prix bouteille: {prix_bouteille:,.2f} | "
-                            f"Prix verre: {prix_verre:,.2f} | "
-                            f"Unite par defaut: {selected_product['unite_vente']}"
-                        )
-
-            quantite = st.number_input(
-                "Quantite", min_value=1, step=1, key="sale_quantite"
-            )
-            date_vente = st.date_input(
-                "Date vente", value=date.today(), key="sale_date"
-            )
-            unite_disabled = (
-                type_vente == "Produit stockable" and selected_product is not None
-            )
-            unite_vente = st.selectbox(
-                "Unite",
-                ["bouteille", "verre"],
-                key="sale_unite",
-                disabled=unite_disabled,
-            )
-
-            non_stockable = categories_df[categories_df["stockable"] == 0]
-            category_map = {}
-            category_keys = []
-            if not non_stockable.empty:
-                category_map = build_category_map(non_stockable)
-                category_keys = list(category_map.keys())
-
-            if type_vente == "Cocktail / Mocktail":
-                if non_stockable.empty:
-                    st.info("Aucune categorie Cocktail/Mocktail")
-                else:
-                    selected_category = st.selectbox(
-                        "Categorie", category_keys, key="sale_category"
-                    )
-                    nom_preparation = st.text_input(
-                        "Nom preparation", key="sale_nom_preparation"
-                    )
-                    prix_vente = st.number_input(
-                        "Prix vente",
-                        min_value=0.0,
-                        step=0.01,
-                        key="sale_prix_vente",
-                    )
-
-            receipt_context = st.session_state.get("receipt_context")
-            if receipt_context and receipt_context.get("label") != selected_receipt:
-                st.warning(
-                    "Un recu est deja en cours. Videz la liste ou enregistrez avant de changer."
-                )
-                can_add = False
-            else:
-                can_add = True
-
-            submitted = st.form_submit_button("Ajouter au recu", disabled=not can_add)
-            if submitted:
-                if type_vente == "Produit stockable":
-                    if products_df.empty:
-                        st.error("Aucun produit disponible")
-                    elif selected_product is None:
-                        st.error("Selectionnez un produit")
-                    else:
-                        unite_effective = (
-                            selected_product.get("unite_vente") or unite_vente
-                        )
-                        st.session_state["receipt_items"].append(
-                            {
-                                "type": "stockable",
-                                "product_id": selected_product["id_produit"],
-                                "product_label": selected_key,
-                                "quantite": quantite,
-                                "date_vente": date_vente,
-                                "unite_vente": unite_effective,
-                            }
-                        )
-                        if not st.session_state["receipt_context"]:
-                            st.session_state["receipt_context"] = {
-                                "label": selected_receipt,
-                                "receipt_id": receipt_map.get(selected_receipt),
-                                "nom_client": nom_client,
-                            }
-                        st.session_state["sale_keep_receipt"] = True
-                        st.session_state["sale_reset"] = True
-                        st.rerun()
-                else:
-                    if non_stockable.empty:
-                        st.error("Aucune categorie Cocktail/Mocktail")
-                    elif st.session_state.get("sale_nom_preparation") in (None, ""):
-                        st.error("Nom preparation obligatoire")
-                    elif st.session_state.get("sale_prix_vente", 0) <= 0:
-                        st.error("Prix vente obligatoire")
-                    else:
-                        st.session_state["receipt_items"].append(
-                            {
-                                "type": "non_stockable",
-                                "category_id": category_map[selected_category][
-                                    "id_categorie"
-                                ],
-                                "category_label": selected_category,
-                                "nom_preparation": st.session_state[
-                                    "sale_nom_preparation"
-                                ],
-                                "prix_vente": st.session_state["sale_prix_vente"],
-                                "quantite": quantite,
-                                "date_vente": date_vente,
-                                "unite_vente": unite_vente,
-                            }
-                        )
-                        if not st.session_state["receipt_context"]:
-                            st.session_state["receipt_context"] = {
-                                "label": selected_receipt,
-                                "receipt_id": receipt_map.get(selected_receipt),
-                                "nom_client": nom_client,
-                            }
-                        st.session_state["sale_keep_receipt"] = True
-                        st.session_state["sale_reset"] = True
-                        st.rerun()
-    else:
+    if categories_df.empty:
         st.info("Ajoutez des categories avant de saisir une vente")
+        return
 
-    if st.session_state["receipt_items"]:
-        st.subheader("Articles du recu")
-        display_items = []
-        for item in st.session_state["receipt_items"]:
-            if item["type"] == "stockable":
-                display_items.append(
-                    {
-                        "Article": item["product_label"],
-                        "Type": "Produit",
-                        "Quantite": item["quantite"],
-                        "Unite": item["unite_vente"],
-                        "Date": item["date_vente"],
-                    }
+    product_map = build_product_map(products_df) if not products_df.empty else {}
+
+    header_left, header_right = st.columns([2, 1], vertical_alignment="bottom")
+    with header_left:
+        sale_day = st.date_input("Date", value=date.today(), key="sale_day")
+    with header_right:
+        st.markdown("<div style='height: 1.6rem'></div>", unsafe_allow_html=True)
+        save_clicked = st.button(
+            "Enregistrer les ventes",
+            use_container_width=True,
+            disabled=not st.session_state["receipt_items"],
+        )
+
+    category_labels = {
+        row["id_categorie"]: f"{row['libelle']} (#{row['id_categorie']})"
+        for row in categories_df.to_dict("records")
+    }
+
+    selected_product = None
+    selected_key = None
+    prix_unitaire = st.session_state.get("sale_unit_price", 0.0)
+    quantite = st.session_state.get("sale_quantite", 1)
+    unite_vente = st.session_state.get("sale_unite", "bouteille")
+
+    cols = st.columns([5, 1.2, 1.5, 1.5, 1.2], vertical_alignment="bottom")
+    if products_df.empty:
+        cols[0].info("Ajoutez un produit avant de saisir une vente")
+        add_clicked = cols[4].button("Ajouter", disabled=True)
+    else:
+        selected_key = cols[0].selectbox(
+            "Produit",
+            list(product_map.keys()),
+            index=None,
+            placeholder="Selectionner un produit",
+            key="sale_product",
+        )
+        quantite = cols[1].number_input(
+            "Quantite", min_value=1, step=1, key="sale_quantite"
+        )
+        if selected_key:
+            selected_product = product_map[selected_key]
+            unite_vente = selected_product.get("unite_vente", "bouteille")
+            st.session_state["sale_unite"] = unite_vente
+            if unite_vente == "verre":
+                prix_unitaire = float(
+                    selected_product.get("prix_vente_verre") or 0
                 )
             else:
-                display_items.append(
-                    {
-                        "Article": f"{item['nom_preparation']} ({item['category_label']})",
-                        "Type": "Cocktail/Mocktail",
-                        "Quantite": item["quantite"],
-                        "Unite": item["unite_vente"],
-                        "Prix vente": item["prix_vente"],
-                        "Date": item["date_vente"],
-                    }
+                prix_unitaire = float(
+                    selected_product.get("prix_vente_bouteille") or 0
                 )
-        items_df = pd.DataFrame(display_items)
-        show_dataframe(items_df, "Aucun article")
-        col_a, col_b = st.columns(2)
-        if col_a.button("Vider la liste", key="clear_receipt_items"):
-            st.session_state["receipt_items"] = []
-            st.session_state["receipt_context"] = None
-            st.rerun()
-        if col_b.button("Enregistrer le recu", key="save_receipt"):
-            context = st.session_state.get("receipt_context") or {}
-            receipt_id = context.get("receipt_id")
-            if receipt_id is None:
-                receipt_id = create_receipt(context.get("nom_client"))
-            for item in st.session_state["receipt_items"]:
-                if item["type"] == "stockable":
-                    add_sale_stockable(
-                        item["product_id"],
-                        item["quantite"],
-                        item["date_vente"],
-                        item["unite_vente"],
-                        receipt_id,
-                    )
-                else:
-                    add_sale_non_stockable(
-                        item["category_id"],
-                        item["nom_preparation"],
-                        item["quantite"],
-                        item["prix_vente"],
-                        item["date_vente"],
-                        item["unite_vente"],
-                        receipt_id,
-                    )
-            st.session_state["receipt_items"] = []
-            st.session_state["receipt_context"] = None
-            st.session_state["sale_keep_receipt"] = False
+            st.session_state["sale_unit_price"] = prix_unitaire
+        else:
+            st.session_state["sale_unit_price"] = 0.0
+            prix_unitaire = 0.0
+
+        st.session_state["sale_unite_display"] = unite_vente
+        cols[2].selectbox(
+            "Unite",
+            ["bouteille", "verre"],
+            index=0 if unite_vente == "bouteille" else 1,
+            key="sale_unite_display",
+            disabled=True,
+        )
+        cols[3].number_input(
+            "Prix de vente",
+            value=float(prix_unitaire),
+            step=0.01,
+            disabled=True,
+        )
+        cols[4].markdown("<div style='height: 1.6rem'></div>", unsafe_allow_html=True)
+        add_clicked = cols[4].button("Ajouter")
+
+    if add_clicked:
+        if products_df.empty:
+            st.error("Aucun produit disponible")
+        elif selected_product is None:
+            st.error("Selectionnez un produit")
+        elif prix_unitaire <= 0:
+            st.error("Prix de vente non defini pour ce produit")
+        else:
+            st.session_state["receipt_items"].append(
+                {
+                    "product_id": selected_product["id_produit"],
+                    "product_label": selected_key,
+                    "quantite": quantite,
+                    "date_vente": sale_day,
+                    "unite_vente": unite_vente,
+                }
+            )
             st.session_state["sale_reset"] = True
-            st.success("Recu enregistre")
             st.rerun()
+
+    receipt_items = st.session_state["receipt_items"]
+    display_items = []
+    total_montant = Decimal("0")
+    total_quantite = 0
+    total_all = Decimal("0")
+    product_lookup = {
+        row["id_produit"]: row for row in products_df.to_dict("records")
+    }
+    for item in receipt_items:
+        product = product_lookup.get(item["product_id"])
+        if product:
+            categorie = category_labels.get(
+                product.get("id_categorie"), product.get("categorie", "")
+            )
+        else:
+            categorie = ""
+        if item["unite_vente"] == "verre":
+            prix_unitaire = Decimal(str(product.get("prix_vente_verre") or 0))
+        else:
+            prix_unitaire = Decimal(str(product.get("prix_vente_bouteille") or 0))
+        article = product["nom_produit"] if product else item["product_label"]
+        montant = (prix_unitaire * Decimal(item["quantite"])).quantize(
+            Decimal("0.01")
+        )
+        total_all += montant
+        display_items.append(
+            {
+                "Produit": article,
+                "Categorie": categorie,
+                "Quantite vendue": item["quantite"],
+                "Unite": item["unite_vente"],
+                "Montant": float(montant),
+            }
+        )
+        total_montant += montant
+        total_quantite += item["quantite"]
+
+    if display_items:
+        display_items.append(
+            {
+                "Produit": "Total du jour",
+                "Categorie": "",
+                "Quantite vendue": total_quantite,
+                "Unite": "",
+                "Montant": float(total_montant),
+            }
+        )
+    table_df = pd.DataFrame(
+        display_items,
+        columns=[
+            "Produit",
+            "Categorie",
+            "Quantite vendue",
+            "Unite",
+            "Montant",
+        ],
+    )
+    st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+    if receipt_items:
+        action_col, total_col = st.columns([1, 2])
+        if action_col.button("Vider la liste", key="clear_receipt_items"):
+            st.session_state["receipt_items"] = []
+            st.rerun()
+        total_col.markdown(
+            f"**Total du jour**: {total_all:,.2f}"
+        )
+
+    if save_clicked:
+        receipt_id = create_receipt()
+        for item in st.session_state["receipt_items"]:
+            add_sale_stockable(
+                item["product_id"],
+                item["quantite"],
+                item["date_vente"],
+                item["unite_vente"],
+                receipt_id,
+            )
+        st.session_state["receipt_items"] = []
+        st.session_state["sale_reset"] = True
+        st.success("Ventes enregistrees")
+        st.rerun()
 
     st.subheader("Historique")
     if categories_df.empty:
