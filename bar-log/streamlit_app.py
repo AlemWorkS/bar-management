@@ -607,6 +607,7 @@ def list_products():
                p.prix_vente_verre,
                p.stock_actuel,
                p.unite_vente,
+               p.verres_par_bouteille,
                p.id_categorie
         FROM produit p
         JOIN categorie c ON p.id_categorie = c.id_categorie
@@ -615,7 +616,7 @@ def list_products():
     )
 
 
-def create_product(nom, id_categorie):
+def create_product(nom, id_categorie, verres_par_bouteille):
     exec_query(
         """
         INSERT INTO produit (
@@ -625,11 +626,12 @@ def create_product(nom, id_categorie):
             prix_vente_bouteille,
             prix_vente_verre,
             stock_actuel,
-            unite_vente
+            unite_vente,
+            verres_par_bouteille
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (nom, id_categorie, 0, 0, 0, 0, "bouteille"),
+        (nom, id_categorie, 0, 0, 0, 0, "bouteille", verres_par_bouteille),
     )
 
 
@@ -880,7 +882,13 @@ def list_sales(start_date=None, end_date=None, product_id=None, category_id=None
                CASE
                    WHEN v.id_produit IS NOT NULL THEN p.nom_produit
                    ELSE v.nom_preparation
-               END AS article
+               END AS article,
+               CASE
+                   WHEN v.type_vente = 'verre' THEN 
+                       (v.montant - (COALESCE(p.prix_achat, 0) / NULLIF(p.verres_par_bouteille, 0) * v.quantite))
+                   ELSE
+                       (v.montant - COALESCE(p.prix_achat, 0) * v.quantite)
+               END AS marge
         FROM vente v
         JOIN categorie c ON v.id_categorie = c.id_categorie
         LEFT JOIN produit p ON v.id_produit = p.id_produit
@@ -1088,7 +1096,7 @@ def render_products():
 
     with tab_add:
         if st.session_state.get("product_added"):
-            st.success("Produit ajoute")
+            st.success("Produit ajouté")
             st.session_state["product_added"] = False
         category_map = None
         category_keys = []
@@ -1097,20 +1105,23 @@ def render_products():
             category_keys = list(category_map.keys())
         with st.form("add_product", clear_on_submit=True):
             if categories_df.empty:
-                st.info("Ajoutez des categories stockables avant de creer un produit")
+                st.info("Ajoutez des catégories stockables avant de créer un produit")
                 submitted = st.form_submit_button("Ajouter")
             else:
                 nom = st.text_input("Nom du produit")
-                categorie_key = st.selectbox("Categorie", category_keys)
+                categorie_key = st.selectbox("Catégorie", category_keys)
+                verres_par_bouteille = st.number_input(
+                    "Nombre de verres par bouteille", min_value=1, step=1
+                )
                 submitted = st.form_submit_button("Ajouter")
         if submitted:
             if categories_df.empty:
-                st.error("Aucune categorie stockable disponible")
+                st.error("Aucune catégorie stockable disponible")
             elif not nom:
                 st.error("Nom du produit requis")
             else:
                 category = category_map[categorie_key]
-                create_product(nom, category["id_categorie"])
+                create_product(nom, category["id_categorie"], verres_par_bouteille)
                 st.session_state["product_added"] = True
                 st.rerun()
 
@@ -1430,21 +1441,35 @@ def render_sales():
     }
     for item in receipt_items:
         product = product_lookup.get(item["product_id"])
-        
-        # Récupération des données de base
-        prix_achat = Decimal(str(product.get("prix_achat") or 0))
-        
+        prix_achat_btl = Decimal(str(product.get("prix_achat") or 0))
+        prix_vente_btl = Decimal(str(product.get("prix_vente_bouteille") or 0))
+        marge_ligne = Decimal("0")
+        prix_vente = 0
+
         if item["unite_vente"] == "verre":
-            prix_unitaire = Decimal(str(product.get("prix_vente_verre") or 0))
+            verres_par_btl = int(str(product.get("verres_par_bouteille")) or 1)
+            prix_vente_unitaire_verre = Decimal(str(product.get("prix_vente_verre") or 0))
+            prix_vente = prix_vente_unitaire_verre
+            # Le coût d'un seul verre est le prix d'achat bouteille divisé par le rendement
+            estimation_prix_achat_unitaire_verre = (prix_achat_btl / verres_par_btl).quantize(Decimal("0.01"))
+
+            quantite = Decimal(item["quantite"])
+
+            cout_total_vente = (prix_vente * quantite).quantize(Decimal("0.01"))
+            estimation_cout_total_achat_verre = (estimation_prix_achat_unitaire_verre * quantite).quantize(Decimal("0.01"))
+            
+            
+            marge_ligne = cout_total_vente - estimation_cout_total_achat_verre
+
         else:
-            prix_unitaire = Decimal(str(product.get("prix_vente_bouteille") or 0))
+            prix_vente = prix_vente_btl
+            cout_total_vente = (prix_vente * Decimal(item["quantite"])).quantize(Decimal("0.01"))
+            marge_ligne = cout_total_vente - (prix_achat_btl * item["quantite"])
+
+
+        # Calculs finaux pour le tableau
         
-        # Calculs financiers
-        montant = (prix_unitaire * Decimal(item["quantite"])).quantize(Decimal("0.01"))
-        cout_total = (prix_achat * Decimal(item["quantite"])).quantize(Decimal("0.01"))
-        marge_ligne = montant - cout_total
-        
-        total_all += montant
+        total_all += cout_total_vente
         article = product["nom_produit"] if product else item["product_label"]
         categorie = category_labels.get(product.get("id_categorie"), "")
 
@@ -1453,14 +1478,14 @@ def render_sales():
                 "Produit": article,
                 "Categorie": categorie,
                 "Quantite": item["quantite"],
-                "Prix de vente": float(prix_unitaire),
-                "Prix d'achat": float(prix_achat),
+                "Prix de vente": float(prix_vente),
+                "Prix d'achat": float(prix_achat_btl),
                 "Unite": item["unite_vente"],
-                "Montant": float(montant),
+                "Montant": float(cout_total_vente),
                 "Marge": float(marge_ligne), # Nouvelle colonne
             }
         )
-        total_montant += montant
+        total_montant += cout_total_vente
         total_quantite += item["quantite"]
 
     if display_items:
@@ -1469,8 +1494,8 @@ def render_sales():
                 "Produit": "Total du jour",
                 "Categorie": "",
                 "Quantite": total_quantite,
-                "Prix d'achat": float(prix_achat),
-                "Prix de vente": float(prix_unitaire),
+                "Prix d'achat": float(prix_achat_btl),
+                "Prix de vente": float(prix_vente),
                 "Unite": "",
                 "Montant": float(total_montant),
                 "Marge": float(marge_ligne)
