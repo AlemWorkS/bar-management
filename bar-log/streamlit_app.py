@@ -1430,28 +1430,34 @@ def render_sales():
     }
     for item in receipt_items:
         product = product_lookup.get(item["product_id"])
-        if product:
-            categorie = category_labels.get(
-                product.get("id_categorie"), product.get("categorie", "")
-            )
-        else:
-            categorie = ""
+        
+        # Récupération des données de base
+        prix_achat = Decimal(str(product.get("prix_achat") or 0))
+        
         if item["unite_vente"] == "verre":
             prix_unitaire = Decimal(str(product.get("prix_vente_verre") or 0))
         else:
             prix_unitaire = Decimal(str(product.get("prix_vente_bouteille") or 0))
-        article = product["nom_produit"] if product else item["product_label"]
-        montant = (prix_unitaire * Decimal(item["quantite"])).quantize(
-            Decimal("0.01")
-        )
+        
+        # Calculs financiers
+        montant = (prix_unitaire * Decimal(item["quantite"])).quantize(Decimal("0.01"))
+        cout_total = (prix_achat * Decimal(item["quantite"])).quantize(Decimal("0.01"))
+        marge_ligne = montant - cout_total
+        
         total_all += montant
+        article = product["nom_produit"] if product else item["product_label"]
+        categorie = category_labels.get(product.get("id_categorie"), "")
+
         display_items.append(
             {
                 "Produit": article,
                 "Categorie": categorie,
-                "Quantite vendue": item["quantite"],
+                "Quantite": item["quantite"],
+                "Prix de vente": float(prix_unitaire),
+                "Prix d'achat": float(prix_achat),
                 "Unite": item["unite_vente"],
                 "Montant": float(montant),
+                "Marge": float(marge_ligne), # Nouvelle colonne
             }
         )
         total_montant += montant
@@ -1462,9 +1468,12 @@ def render_sales():
             {
                 "Produit": "Total du jour",
                 "Categorie": "",
-                "Quantite vendue": total_quantite,
+                "Quantite": total_quantite,
+                "Prix d'achat": float(prix_achat),
+                "Prix de vente": float(prix_unitaire),
                 "Unite": "",
                 "Montant": float(total_montant),
+                "Marge": float(marge_ligne)
             }
         )
     table_df = pd.DataFrame(
@@ -1472,20 +1481,27 @@ def render_sales():
         columns=[
             "Produit",
             "Categorie",
-            "Quantite vendue",
+            "Quantite",
+            "Prix d'achat",
+            "Prix de vente",
             "Unite",
             "Montant",
+            "Marge",
         ],
     )
     st.dataframe(table_df, use_container_width=True, hide_index=True)
 
     if receipt_items:
+        # Calcul de la marge totale de la liste actuelle
+        total_marge_session = sum(Decimal(str(i["Marge"])) for i in display_items if i["Produit"] != "Total du jour")
+        
         action_col, total_col = st.columns([1, 2])
         if action_col.button("Vider la liste", key="clear_receipt_items"):
             st.session_state["receipt_items"] = []
             st.rerun()
+        
         total_col.markdown(
-            f"**Total du jour**: {total_all:,.2f}"
+            f"**Total Ventes**: {total_all:,.2f} | **Marge estimée**: {total_marge_session:,.2f}"
         )
 
     if save_clicked:
