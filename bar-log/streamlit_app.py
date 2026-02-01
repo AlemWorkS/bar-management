@@ -18,13 +18,18 @@ def apply_theme():
 
         /* Base globale */
         :root {
-          --bg: #f4f6fb;
+          --bg: #f6f7fb;
+          --sidebar-bg: #ffffff;
           --card: #ffffff;
-          --border: #e5e7ef;
+          --border: #e6e9f2;
           --text: #1b1f2a;
           --muted: #7b8397;
           --accent: #ff7a00;
           --accent-soft: #fff1e6;
+          --pill-blue: #dbe7ff;
+          --pill-green: #dff7e5;
+          --pill-yellow: #fff1cc;
+          --pill-red: #ffe0e0;
         }
 
         html, body, [class*="stApp"] {
@@ -71,7 +76,7 @@ def apply_theme():
 
         /* Sidebar */
         section[data-testid="stSidebar"] {
-          background: #f1f3f8;
+          background: var(--sidebar-bg);
           border-right: 1px solid var(--border);
           color: var(--text);
         }
@@ -324,7 +329,8 @@ def apply_theme():
           background: var(--card);
           border: 1px solid var(--border);
           border-radius: 14px;
-          padding: 8px;
+          padding: 10px;
+          box-shadow: 0 1px 0 rgba(16, 24, 40, 0.04);
         }
 
         div[data-testid="stDataFrame"] {
@@ -337,12 +343,12 @@ def apply_theme():
           margin-top: 10px;
           border: 1px solid var(--border);
           border-radius: 10px;
-          padding: 10px 16px;
+          padding: 8px 16px;
           margin-right: 6px;
           color: var(--text);
           line-height: 1.3;
           height: auto;
-          min-height: 38px;
+          min-height: 36px;
           align-items: center;
           overflow: visible;
           display: inline-flex;
@@ -353,6 +359,7 @@ def apply_theme():
           background: var(--accent);
           color: #ffffff;
           border-color: var(--accent);
+          box-shadow: 0 4px 10px rgba(255, 122, 0, 0.2);
         }
 
         div[data-testid="stTabs"] {
@@ -508,6 +515,64 @@ def apply_theme():
           color: #ffffff;
         }
 
+        /* Tables (style proche maquette) */
+        div[data-testid="stDataFrame"] thead tr th {
+          background: #f3f5fb !important;
+          color: var(--muted) !important;
+          font-weight: 600 !important;
+          border-bottom: 1px solid var(--border) !important;
+        }
+
+        div[data-testid="stDataFrame"] tbody tr {
+          background: #ffffff !important;
+        }
+
+        div[data-testid="stDataFrame"] tbody tr td {
+          border-bottom: 1px solid var(--border) !important;
+        }
+
+        /* Ventes (mise en page proche maquette) */
+        .breadcrumb {
+          color: var(--muted);
+          font-size: 12px;
+          margin-bottom: 6px;
+        }
+
+        .breadcrumb .active {
+          color: var(--accent);
+          font-weight: 600;
+        }
+
+        .sales-card {
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 16px;
+          box-shadow: 0 1px 0 rgba(16, 24, 40, 0.04);
+          margin-top: 10px;
+        }
+
+        .sales-section-title {
+          font-size: 18px;
+          font-weight: 700;
+          margin: 8px 0 8px 0;
+        }
+
+        .sales-muted {
+          color: var(--muted);
+          font-size: 12px;
+        }
+
+        .inline-pill {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 600;
+          background: var(--pill-blue);
+          color: #2f5cff;
+        }
+
         /* Radios (Oui / Non) */
         div[data-testid="stRadio"] label,
         div[data-testid="stRadio"] span {
@@ -521,6 +586,14 @@ def apply_theme():
 
         div[data-testid="stRadio"] * {
           color: var(--text) !important;
+        }
+
+        /* Checkbox (confirmation suppression) */
+        div[data-testid="stCheckbox"] label,
+        div[data-testid="stCheckbox"] span,
+        div[data-testid="stCheckbox"] p {
+          color: var(--text) !important;
+          opacity: 1 !important;
         }
 
         /* Footer (reserve) */
@@ -538,6 +611,13 @@ def render_page_title(title, subtitle=None):
             f"<div class='page-subtitle'>{subtitle}</div>",
             unsafe_allow_html=True,
         )
+
+
+def fmt_fcfa(value):
+    try:
+        return f"{Decimal(str(value)):,.2f} FCFA"
+    except Exception:
+        return "0.00 FCFA"
 
 
 # --- Acces aux donnees ---
@@ -1048,9 +1128,9 @@ def render_dashboard():
     net = Decimal(str(marge)) - Decimal(str(total_charges))
 
     col1, col2, col4 = st.columns(3)
-    col1.metric("Ventes du jour", f"{total_ventes:,.2f}")
-    col2.metric("Marge du jour", f"{marge:,.2f}")
-    col4.metric("Net du jour", f"{net:,.2f}")
+    col1.metric("Ventes du jour", fmt_fcfa(total_ventes))
+    col2.metric("Marge du jour", fmt_fcfa(marge))
+    col4.metric("Net du jour", fmt_fcfa(net))
 
     st.subheader("Stock faible")
     threshold = st.number_input(
@@ -1306,29 +1386,69 @@ def render_entries():
                     st.session_state["entry_reset"] = True
                     st.rerun()
 
-    st.subheader("Historique")
-    if products_df.empty:
-        st.info("Aucun produit")
+    st.markdown("<div class='sales-section-title'>Historique</div>", unsafe_allow_html=True)
+    if categories_df.empty:
+        st.info("Aucune categorie")
         return
 
-    product_map = build_product_map(products_df)
-    col1, col2, col3 = st.columns(3)
-    start_date = col1.date_input("Debut", value=date.today().replace(day=1), key="entree_start")
-    end_date = col2.date_input("Fin", value=date.today(), key="entree_end")
-    product_filter = col3.selectbox(
-        "Produit", ["Tous"] + list(product_map.keys()), key="entree_product"
-    )
+    product_map = build_product_map(products_df) if not products_df.empty else {}
+    category_map = build_category_map(categories_df)
+    hist_left, hist_right = st.columns([3, 2], vertical_alignment="center")
+    with hist_left:
+        period_cols = st.columns(2)
+        start_date = period_cols[0].date_input(
+            "Periode debut", value=date.today().replace(day=1), key="vente_start"
+        )
+        end_date = period_cols[1].date_input(
+            "Periode fin", value=date.today(), key="vente_end"
+        )
+    with hist_right:
+        filter_cols = st.columns(2)
+        category_filter = filter_cols[0].selectbox(
+            "Categorie", ["Toutes"] + list(category_map.keys()), key="vente_category"
+        )
+        product_filter = filter_cols[1].selectbox(
+            "Produit", ["Tous"] + list(product_map.keys()), key="vente_product"
+        )
     product_id = None
     if product_filter != "Tous":
         product_id = product_map[product_filter]["id_produit"]
+    category_id = None
+    if category_filter != "Toutes":
+        category_id = category_map[category_filter]["id_categorie"]
 
-    entries_df = list_entries(start_date, end_date, product_id)
-    show_dataframe(entries_df, "Aucune entree sur la periode")
+    sales_df = list_sales(start_date, end_date, product_id, category_id)
+    if sales_df.empty:
+        st.info("Aucune vente sur la periode")
+        return
+
+    display_sales = sales_df.rename(
+        columns={
+            "date_vente": "Date",
+            "article": "Produit",
+            "categorie": "Categorie",
+            "quantite": "Qte",
+            "type_vente": "Type",
+            "montant": "Montant",
+            "marge": "Marge",
+        }
+    )
+    display_sales = display_sales[
+        ["Date", "Produit", "Categorie", "Qte", "Type", "Montant", "Marge"]
+    ]
+    for col in ["Montant", "Marge"]:
+        display_sales[col] = display_sales[col].apply(fmt_fcfa)
+    st.markdown("<div class='sales-card'>", unsafe_allow_html=True)
+    st.dataframe(display_sales, use_container_width=True, hide_index=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 def render_sales():
-    st.markdown("## Ventes du jour")
-    st.caption("Suivi des sorties")
+    st.markdown(
+        "<div class='breadcrumb'>Tableau de bord / <span class='active'>Ventes</span></div>",
+        unsafe_allow_html=True,
+    )
     products_df = list_products()
     categories_df = list_categories()
 
@@ -1349,9 +1469,13 @@ def render_sales():
 
     product_map = build_product_map(products_df) if not products_df.empty else {}
 
-    header_left, header_right = st.columns([2, 1], vertical_alignment="bottom")
+    header_left, header_right = st.columns([3, 1], vertical_alignment="bottom")
     with header_left:
-        sale_day = st.date_input("Date", value=date.today(), key="sale_day")
+        st.markdown("## Ventes du jour")
+        st.markdown(
+            "<div class='sales-muted'>Enregistrez les sorties de stock et suivez les ventes quotidiennes.</div>",
+            unsafe_allow_html=True,
+        )
     with header_right:
         st.markdown("<div style='height: 1.6rem'></div>", unsafe_allow_html=True)
         save_clicked = st.button(
@@ -1371,21 +1495,27 @@ def render_sales():
     quantite = st.session_state.get("sale_quantite", 1)
     unite_vente = st.session_state.get("sale_unite", "bouteille")
 
-    cols = st.columns([5, 1.2, 1.5, 1.5, 1.2], vertical_alignment="bottom")
-    if products_df.empty:
-        cols[0].info("Ajoutez un produit avant de saisir une vente")
-        add_clicked = cols[4].button("Ajouter", disabled=True)
-    else:
-        selected_key = cols[0].selectbox(
-            "Produit",
-            list(product_map.keys()),
-            index=None,
-            placeholder="Selectionner un produit",
-            key="sale_product",
-        )
-        quantite = cols[1].number_input(
+    st.markdown("<div class='sales-card'>", unsafe_allow_html=True)
+    cols = st.columns([2, 4, 2, 2, 2, 0.8], vertical_alignment="bottom")
+    with cols[0]:
+        sale_day = st.date_input("Date", value=date.today(), key="sale_day")
+    with cols[1]:
+        if products_df.empty:
+            st.info("Ajoutez un produit avant de saisir une vente")
+            selected_key = None
+        else:
+            selected_key = st.selectbox(
+                "Produit",
+                list(product_map.keys()),
+                index=None,
+                placeholder="Selectionner un produit",
+                key="sale_product",
+            )
+    with cols[2]:
+        quantite = st.number_input(
             "Quantite", min_value=1, step=1, key="sale_quantite"
         )
+    with cols[3]:
         if selected_key:
             selected_product = product_map[selected_key]
             unite_vente = selected_product.get("unite_vente", "bouteille")
@@ -1404,21 +1534,23 @@ def render_sales():
             prix_unitaire = 0.0
 
         st.session_state["sale_unite_display"] = unite_vente
-        cols[2].selectbox(
+        st.selectbox(
             "Unite",
             ["bouteille", "verre"],
             index=0 if unite_vente == "bouteille" else 1,
             key="sale_unite_display",
             disabled=True,
         )
-        cols[3].number_input(
-            "Prix de vente",
+    with cols[4]:
+        st.number_input(
+            "Prix vente (FCFA)",
             value=float(prix_unitaire),
             step=0.01,
             disabled=True,
         )
-        cols[4].markdown("<div style='height: 1.6rem'></div>", unsafe_allow_html=True)
-        add_clicked = cols[4].button("Ajouter")
+    with cols[5]:
+        add_clicked = st.button("?", key="sale_add_btn")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if add_clicked:
         if products_df.empty:
@@ -1444,17 +1576,14 @@ def render_sales():
     display_items = []
     total_montant = Decimal("0")
     total_quantite = 0
-    total_all = Decimal("0")
+    total_marge = Decimal("0")
     product_lookup = {
         row["id_produit"]: row for row in products_df.to_dict("records")
     }
     for item in receipt_items:
         product = product_lookup.get(item["product_id"])
-        prix_achat_btl = Decimal(str(product.get("prix_achat") or 0))
+        prix_achat = Decimal(str(product.get("prix_achat") or 0))
         prix_vente_btl = Decimal(str(product.get("prix_vente_bouteille") or 0))
-        marge_ligne = Decimal("0")
-        prix_vente = 0
-
         if item["unite_vente"] == "verre":
             prix_vente = Decimal(str(product.get("prix_vente_verre") or 0))
         else:
@@ -1462,12 +1591,8 @@ def render_sales():
 
         quantite = Decimal(item["quantite"])
         cout_total_vente = (prix_vente * quantite).quantize(Decimal("0.01"))
-        marge_ligne = cout_total_vente - (prix_achat_btl * quantite)
+        marge_ligne = cout_total_vente - (prix_achat * quantite)
 
-
-        # Calculs finaux pour le tableau
-        
-        total_all += cout_total_vente
         article = product["nom_produit"] if product else item["product_label"]
         categorie = category_labels.get(product.get("id_categorie"), "")
 
@@ -1476,15 +1601,14 @@ def render_sales():
                 "Produit": article,
                 "Categorie": categorie,
                 "Quantite": item["quantite"],
-                "Prix de vente": float(prix_vente),
-                "Prix d'achat": float(prix_achat_btl),
                 "Unite": item["unite_vente"],
                 "Montant": float(cout_total_vente),
-                "Marge": float(marge_ligne), # Nouvelle colonne
+                "Marge": float(marge_ligne),
             }
         )
         total_montant += cout_total_vente
         total_quantite += item["quantite"]
+        total_marge += marge_ligne
 
     if display_items:
         display_items.append(
@@ -1492,40 +1616,39 @@ def render_sales():
                 "Produit": "Total du jour",
                 "Categorie": "",
                 "Quantite": total_quantite,
-                "Prix d'achat": float(prix_achat_btl),
-                "Prix de vente": float(prix_vente),
                 "Unite": "",
                 "Montant": float(total_montant),
-                "Marge": float(marge_ligne)
+                "Marge": float(total_marge),
             }
         )
-    table_df = pd.DataFrame(
-        display_items,
-        columns=[
-            "Produit",
-            "Categorie",
-            "Quantite",
-            "Prix d'achat",
-            "Prix de vente",
-            "Unite",
-            "Montant",
-            "Marge",
-        ],
-    )
-    st.dataframe(table_df, use_container_width=True, hide_index=True)
 
-    if receipt_items:
-        # Calcul de la marge totale de la liste actuelle
-        total_marge_session = sum(Decimal(str(i["Marge"])) for i in display_items if i["Produit"] != "Total du jour")
-        
+    if display_items:
+        st.markdown("<div class='sales-card'>", unsafe_allow_html=True)
+        table_df = pd.DataFrame(
+            display_items,
+            columns=[
+                "Produit",
+                "Categorie",
+                "Quantite",
+                "Unite",
+                "Montant",
+                "Marge",
+            ],
+        )
+        for col in ["Montant", "Marge"]:
+            if col in table_df.columns:
+                table_df[col] = table_df[col].apply(fmt_fcfa)
+        st.dataframe(table_df, use_container_width=True, hide_index=True)
+
         action_col, total_col = st.columns([1, 2])
         if action_col.button("Vider la liste", key="clear_receipt_items"):
             st.session_state["receipt_items"] = []
             st.rerun()
-        
+
         total_col.markdown(
-            f"**Total Ventes**: {total_all:,.2f} | **Marge estimée**: {total_marge_session:,.2f}"
+            f"**Total Ventes**: {fmt_fcfa(total_montant)} | **Marge estimee**: {fmt_fcfa(total_marge)}"
         )
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if save_clicked:
         receipt_id = create_receipt()
@@ -1542,22 +1665,30 @@ def render_sales():
         st.success("Ventes enregistrees")
         st.rerun()
 
-    st.subheader("Historique")
+    st.markdown("<div class='sales-section-title'>Historique</div>", unsafe_allow_html=True)
     if categories_df.empty:
         st.info("Aucune categorie")
         return
 
     product_map = build_product_map(products_df) if not products_df.empty else {}
     category_map = build_category_map(categories_df)
-    col1, col2, col3, col4 = st.columns(4)
-    start_date = col1.date_input("Debut", value=date.today().replace(day=1), key="vente_start")
-    end_date = col2.date_input("Fin", value=date.today(), key="vente_end")
-    category_filter = col3.selectbox(
-        "Categorie", ["Toutes"] + list(category_map.keys()), key="vente_category"
-    )
-    product_filter = col4.selectbox(
-        "Produit", ["Tous"] + list(product_map.keys()), key="vente_product"
-    )
+    hist_left, hist_right = st.columns([3, 2], vertical_alignment="center")
+    with hist_left:
+        period_cols = st.columns(2)
+        start_date = period_cols[0].date_input(
+            "Periode debut", value=date.today().replace(day=1), key="vente_start"
+        )
+        end_date = period_cols[1].date_input(
+            "Periode fin", value=date.today(), key="vente_end"
+        )
+    with hist_right:
+        filter_cols = st.columns(2)
+        category_filter = filter_cols[0].selectbox(
+            "Categorie", ["Toutes"] + list(category_map.keys()), key="vente_category"
+        )
+        product_filter = filter_cols[1].selectbox(
+            "Produit", ["Tous"] + list(product_map.keys()), key="vente_product"
+        )
     product_id = None
     if product_filter != "Tous":
         product_id = product_map[product_filter]["id_produit"]
@@ -1566,7 +1697,29 @@ def render_sales():
         category_id = category_map[category_filter]["id_categorie"]
 
     sales_df = list_sales(start_date, end_date, product_id, category_id)
-    show_dataframe(sales_df, "Aucune vente sur la periode")
+    if sales_df.empty:
+        st.info("Aucune vente sur la periode")
+        return
+
+    display_sales = sales_df.rename(
+        columns={
+            "date_vente": "Date",
+            "article": "Produit",
+            "categorie": "Categorie",
+            "quantite": "Qte",
+            "type_vente": "Type",
+            "montant": "Montant",
+            "marge": "Marge",
+        }
+    )
+    display_sales = display_sales[
+        ["Date", "Produit", "Categorie", "Qte", "Type", "Montant", "Marge"]
+    ]
+    for col in ["Montant", "Marge"]:
+        display_sales[col] = display_sales[col].apply(fmt_fcfa)
+    st.markdown("<div class='sales-card'>", unsafe_allow_html=True)
+    st.dataframe(display_sales, use_container_width=True, hide_index=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_charges():
@@ -1584,51 +1737,89 @@ def render_charges():
         show_dataframe(charges_df, "Aucune charge sur la periode")
 
     with tab_add:
-        with st.form("add_charge"):
-            type_charge = st.text_input("Type charge")
-            montant = st.number_input("Montant", min_value=0.0, step=0.01)
-            date_charge = st.date_input("Date charge", value=date.today())
+        if st.session_state.get("charge_added"):
+            st.success("Charge ajoutee")
+            st.session_state["charge_added"] = False
+
+        if st.session_state.get("charge_reset"):
+            st.session_state["charge_type"] = ""
+            st.session_state["charge_montant"] = 0.0
+            st.session_state["charge_date"] = date.today()
+            st.session_state["charge_reset"] = False
+
+        with st.form("add_charge", clear_on_submit=True):
+            type_charge = st.text_input("Type charge", key="charge_type")
+            montant = st.number_input(
+                "Montant", min_value=0.0, step=0.01, key="charge_montant"
+            )
+            date_charge = st.date_input(
+                "Date charge", value=date.today(), key="charge_date"
+            )
             submitted = st.form_submit_button("Ajouter")
         if submitted:
             if not type_charge:
                 st.error("Type charge requis")
             else:
                 add_charge(type_charge, montant, date_charge)
-                st.success("Charge ajoutee")
+                st.session_state["charge_added"] = True
+                st.session_state["charge_reset"] = True
+                st.rerun()
 
     with tab_edit:
         charges_df = list_charges()
         if charges_df.empty:
             st.info("Aucune charge a modifier")
         else:
-            charge_map = {
-                f"{row['type_charge']} (#{row['id_charge']})": row
-                for row in charges_df.to_dict("records")
-            }
-            selected = st.selectbox(
-                "Charge", list(charge_map.keys()), key="edit_charge_select"
+            event = st.dataframe(
+                charges_df,
+                use_container_width=True,
+                hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row",
+                key="edit_charge_table",
             )
-            charge = charge_map[selected]
-            with st.form("edit_charge"):
-                type_charge = st.text_input(
-                    "Type charge", value=charge["type_charge"]
-                )
-                montant = st.number_input(
-                    "Montant", min_value=0.0, step=0.01,
-                    value=float(charge["montant"]),
-                )
-                date_charge = st.date_input(
-                    "Date charge", value=charge["date_charge"]
-                )
-                submitted = st.form_submit_button("Mettre a jour")
-            if submitted:
-                if not type_charge:
-                    st.error("Type charge requis")
-                else:
-                    update_charge(
-                        charge["id_charge"], type_charge, montant, date_charge
+            selected_charge = None
+            if event.selection.rows:
+                selected_charge = charges_df.iloc[event.selection.rows[0]].to_dict()
+
+            if selected_charge is None:
+                st.info("Selectionnez une ligne du tableau")
+            else:
+                if st.button("Charger pour modifier", key="load_charge_edit"):
+                    st.session_state["edit_charge_id"] = selected_charge["id_charge"]
+                    st.session_state["edit_charge_type"] = selected_charge["type_charge"]
+                    st.session_state["edit_charge_montant"] = float(
+                        selected_charge["montant"]
                     )
-                    st.success("Charge modifiee")
+                    st.session_state["edit_charge_date"] = selected_charge["date_charge"]
+                    st.rerun()
+
+            if st.session_state.get("edit_charge_id"):
+                with st.form("edit_charge"):
+                    type_charge = st.text_input(
+                        "Type charge", key="edit_charge_type"
+                    )
+                    montant = st.number_input(
+                        "Montant", min_value=0.0, step=0.01,
+                        key="edit_charge_montant",
+                    )
+                    date_charge = st.date_input(
+                        "Date charge", key="edit_charge_date"
+                    )
+                    submitted = st.form_submit_button("Mettre a jour")
+                if submitted:
+                    if not type_charge:
+                        st.error("Type charge requis")
+                    else:
+                        update_charge(
+                            st.session_state["edit_charge_id"],
+                            type_charge,
+                            montant,
+                            date_charge,
+                        )
+                        st.success("Charge modifiee")
+                        st.session_state.pop("edit_charge_id", None)
+                        st.rerun()
 
     with tab_delete:
         charges_df = list_charges()
@@ -1666,10 +1857,10 @@ def render_reports():
     net = Decimal(str(marge)) - Decimal(str(total_charges))
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total ventes", f"{total_ventes:,.2f}")
-    col2.metric("Marge", f"{marge:,.2f}")
-    col3.metric("Charges", f"{total_charges:,.2f}")
-    col4.metric("Net", f"{net:,.2f}")
+    col1.metric("Total ventes", fmt_fcfa(total_ventes))
+    col2.metric("Marge", fmt_fcfa(marge))
+    col3.metric("Charges", fmt_fcfa(total_charges))
+    col4.metric("Net", fmt_fcfa(net))
 
     st.subheader("Ventes par jour")
     daily_df = fetch_df(
