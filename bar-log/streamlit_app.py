@@ -607,7 +607,6 @@ def list_products():
                p.prix_vente_verre,
                p.stock_actuel,
                p.unite_vente,
-               p.verres_par_bouteille,
                p.id_categorie
         FROM produit p
         JOIN categorie c ON p.id_categorie = c.id_categorie
@@ -616,7 +615,7 @@ def list_products():
     )
 
 
-def create_product(nom, id_categorie, verres_par_bouteille):
+def create_product(nom, id_categorie):
     exec_query(
         """
         INSERT INTO produit (
@@ -626,12 +625,11 @@ def create_product(nom, id_categorie, verres_par_bouteille):
             prix_vente_bouteille,
             prix_vente_verre,
             stock_actuel,
-            unite_vente,
-            verres_par_bouteille
+            unite_vente
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
-        (nom, id_categorie, 0, 0, 0, 0, "bouteille", verres_par_bouteille),
+        (nom, id_categorie, 0, 0, 0, 0, "bouteille"),
     )
 
 
@@ -883,12 +881,7 @@ def list_sales(start_date=None, end_date=None, product_id=None, category_id=None
                    WHEN v.id_produit IS NOT NULL THEN p.nom_produit
                    ELSE v.nom_preparation
                END AS article,
-               CASE
-                   WHEN v.type_vente = 'verre' THEN 
-                       (v.montant - (COALESCE(p.prix_achat, 0) / NULLIF(p.verres_par_bouteille, 0) * v.quantite))
-                   ELSE
-                       (v.montant - COALESCE(p.prix_achat, 0) * v.quantite)
-               END AS marge
+               (v.montant - COALESCE(p.prix_achat, 0) * v.quantite) AS marge
         FROM vente v
         JOIN categorie c ON v.id_categorie = c.id_categorie
         LEFT JOIN produit p ON v.id_produit = p.id_produit
@@ -1110,9 +1103,6 @@ def render_products():
             else:
                 nom = st.text_input("Nom du produit")
                 categorie_key = st.selectbox("Catégorie", category_keys)
-                verres_par_bouteille = st.number_input(
-                    "Nombre de verres par bouteille", min_value=1, step=1
-                )
                 submitted = st.form_submit_button("Ajouter")
         if submitted:
             if categories_df.empty:
@@ -1121,7 +1111,7 @@ def render_products():
                 st.error("Nom du produit requis")
             else:
                 category = category_map[categorie_key]
-                create_product(nom, category["id_categorie"], verres_par_bouteille)
+                create_product(nom, category["id_categorie"])
                 st.session_state["product_added"] = True
                 st.rerun()
 
@@ -1255,7 +1245,20 @@ def render_entries():
     render_page_title("Entrees de stock", "Approvisionnements et historique")
     products_df = list_products()
 
-    with st.form("add_entry"):
+    if st.session_state.get("entry_reset"):
+        st.session_state["entry_product"] = None
+        st.session_state["entry_quantite"] = 1
+        st.session_state["entry_date"] = date.today()
+        st.session_state["entry_prix_achat"] = 0.0
+        st.session_state["entry_unite"] = "bouteille"
+        st.session_state["entry_prix_vente"] = 0.0
+        st.session_state["entry_reset"] = False
+
+    if st.session_state.get("entry_added"):
+        st.success("Entree enregistree")
+        st.session_state["entry_added"] = False
+
+    with st.form("add_entry", clear_on_submit=True):
         if products_df.empty:
             st.info("Ajoutez un produit avant de saisir une entree")
             submitted = st.form_submit_button("Enregistrer")
@@ -1268,16 +1271,20 @@ def render_entries():
                 placeholder="Selectionner ou rechercher le produit",
                 key="entry_product",
             )
-            quantite = st.number_input("Quantite", min_value=1, step=1)
-            date_entree = st.date_input("Date entree", value=date.today())
-            prix_achat = st.number_input(
-                "Prix achat", min_value=0.0, step=0.01
+            quantite = st.number_input(
+                "Quantite", min_value=1, step=1, key="entry_quantite"
             )
-            prix_vente = st.number_input(
-                "Prix vente", min_value=0.0, step=0.01
+            date_entree = st.date_input(
+                "Date entree", value=date.today(), key="entry_date"
+            )
+            prix_achat = st.number_input(
+                "Prix achat", min_value=0.0, step=0.01, key="entry_prix_achat"
             )
             unite_vente = st.selectbox(
-                "Unite de vente", ["bouteille", "verre"]
+                "Unite de vente", ["bouteille", "verre"], key="entry_unite"
+            )
+            prix_vente = st.number_input(
+                "Prix vente", min_value=0.0, step=0.01, key="entry_prix_vente"
             )
             submitted = st.form_submit_button("Enregistrer")
             if submitted:
@@ -1295,7 +1302,9 @@ def render_entries():
                         prix_vente,
                         unite_vente,
                     )
-                    st.success("Entree enregistree")
+                    st.session_state["entry_added"] = True
+                    st.session_state["entry_reset"] = True
+                    st.rerun()
 
     st.subheader("Historique")
     if products_df.empty:
@@ -1447,24 +1456,13 @@ def render_sales():
         prix_vente = 0
 
         if item["unite_vente"] == "verre":
-            verres_par_btl = int(str(product.get("verres_par_bouteille")) or 1)
-            prix_vente_unitaire_verre = Decimal(str(product.get("prix_vente_verre") or 0))
-            prix_vente = prix_vente_unitaire_verre
-            # Le coût d'un seul verre est le prix d'achat bouteille divisé par le rendement
-            estimation_prix_achat_unitaire_verre = (prix_achat_btl / verres_par_btl).quantize(Decimal("0.01"))
-
-            quantite = Decimal(item["quantite"])
-
-            cout_total_vente = (prix_vente * quantite).quantize(Decimal("0.01"))
-            estimation_cout_total_achat_verre = (estimation_prix_achat_unitaire_verre * quantite).quantize(Decimal("0.01"))
-            
-            
-            marge_ligne = cout_total_vente - estimation_cout_total_achat_verre
-
+            prix_vente = Decimal(str(product.get("prix_vente_verre") or 0))
         else:
             prix_vente = prix_vente_btl
-            cout_total_vente = (prix_vente * Decimal(item["quantite"])).quantize(Decimal("0.01"))
-            marge_ligne = cout_total_vente - (prix_achat_btl * item["quantite"])
+
+        quantite = Decimal(item["quantite"])
+        cout_total_vente = (prix_vente * quantite).quantize(Decimal("0.01"))
+        marge_ligne = cout_total_vente - (prix_achat_btl * quantite)
 
 
         # Calculs finaux pour le tableau
