@@ -1,0 +1,589 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+
+        /* Base globale */
+        :root {
+          --bg: #f6f7fb;
+          --sidebar-bg: #ffffff;
+          --card: #ffffff;
+          --border: #e6e9f2;
+          --text: #1b1f2a;
+          --muted: #7b8397;
+          --accent: #ff7a00;
+          --accent-soft: #fff1e6;
+          --pill-blue: #dbe7ff;
+          --pill-green: #dff7e5;
+          --pill-yellow: #fff1cc;
+          --pill-red: #ffe0e0;
+        }
+
+        html, body, [class*="stApp"] {
+          background: var(--bg);
+          color: var(--text);
+          font-family: "DM Sans", sans-serif;
+        }
+
+        /* Entete (titres de page) */
+        h1, h2, h3, h4, h5, h6, .page-title {
+          font-family: "Space Grotesk", sans-serif;
+          color: var(--text);
+        }
+
+        .page-title {
+          font-size: 28px;
+          font-weight: 600;
+          margin: 0 0 4px 0;
+        }
+
+        .page-subtitle {
+          color: var(--muted);
+          font-size: 13px;
+          margin-bottom: 16px;
+          margin-top: 16px;
+        }
+
+        /* Main (contenu central) */
+        div.block-container {
+          padding-top: 56px;
+          padding-bottom: 28px;
+        }
+
+        /* Inputs desactives lisibles */
+        input:disabled,
+        textarea:disabled,
+        select:disabled,
+        [data-testid="stNumberInput"] input:disabled,
+        [data-testid="stTextInput"] input:disabled {
+          color: var(--text) !important;
+          -webkit-text-fill-color: var(--text) !important;
+          opacity: 1 !important;
+        }
+
+        /* Sidebar */
+        section[data-testid="stSidebar"] {
+          background: var(--sidebar-bg);
+          border-right: 1px solid var(--border);
+          color: var(--text);
+        }
+
+        /* Hide Streamlit automatic page nav above custom sidebar menu */
+        section[data-testid="stSidebar"] [data-testid="stSidebarNav"],
+        section[data-testid="stSidebar"] [data-testid="stSidebarNavSeparator"] {
+          display: none;
+        }
+
+        /* Bouton de rappel de la sidebar */
+        button[data-testid="collapsedControl"] {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+        }
+
+        button[data-testid="collapsedControl"] svg {
+          color: var(--text) !important;
+          opacity: 1 !important;
+        }
+
+        button[data-testid="collapsedControl"]:hover,
+        button[data-testid="collapsedControl"]:active,
+        button[data-testid="collapsedControl"]:focus {
+          background: #111827;
+          border-color: #111827;
+        }
+
+        div[data-testid="stSidebarCollapsedControl"] {
+          opacity: 1 !important;
+          visibility: visible !important;
+          pointer-events: auto !important;
+        }
+
+        /* Bouton de repli de la sidebar (toujours visible) */
+        section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] {
+          display: inline-flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          pointer-events: auto !important;
+        }
+
+        section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button {
+          background: transparent !important;
+          border: none !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+        }
+
+        section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] svg {
+          color: var(--text) !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+        }
+
+        /* Header Streamlit toujours visible (evite le masquage au survol) */
+        header,
+        div[data-testid="stHeader"] {
+          opacity: 1 !important;
+          visibility: visible !important;
+          pointer-events: auto !important;
+          transform: none !important;
+        }
+
+        div[data-testid="stToolbar"] {
+          display: flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          pointer-events: auto !important;
+          transform: none !important;
+        }
+
+        header.stAppHeader,
+        div[data-testid="stHeader"] {
+          background: transparent !important;
+          color: var(--text) !important;
+        }
+
+        header div[data-testid="stSidebarCollapsedControl"] {
+          display: flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          pointer-events: auto !important;
+          transform: none !important;
+          z-index: 1000;
+        }
+
+        header div[data-testid="stSidebarCollapsedControl"] button {
+          display: flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          background: transparent !important;
+          border: none !important;
+        }
+
+        header div[data-testid="stSidebarCollapsedControl"] svg {
+          color: var(--text) !important;
+          fill: var(--text) !important;
+          stroke: var(--text) !important;
+        }
+
+        div[data-testid="stHeader"] [data-testid="stSidebarCollapsedControl"] {
+          display: flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          pointer-events: auto !important;
+          transform: none !important;
+          z-index: 1000;
+        }
+
+        div[data-testid="stHeader"] [data-testid="stSidebarCollapsedControl"] button {
+          display: flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          background: transparent !important;
+          border: none !important;
+        }
+
+        div[data-testid="stHeader"] [data-testid="stSidebarCollapsedControl"] svg {
+          color: var(--text) !important;
+          fill: var(--text) !important;
+          stroke: var(--text) !important;
+        }
+
+        button[data-testid="stSidebarToggleButton"],
+        [data-testid="stSidebarToggleButton"] {
+          display: flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+
+        button[data-testid="stSidebarToggleButton"] svg,
+        [data-testid="stSidebarToggleButton"] svg {
+          color: var(--text) !important;
+          fill: var(--text) !important;
+          stroke: var(--text) !important;
+        }
+
+        button[data-testid="stExpandSidebarButton"] {
+          display: inline-flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+
+        button[data-testid="stExpandSidebarButton"] span,
+        button[data-testid="stExpandSidebarButton"] svg {
+          color: var(--text) !important;
+          fill: var(--text) !important;
+          stroke: var(--text) !important;
+          opacity: 1 !important;
+        }
+
+        button[title="Open sidebar"],
+        button[title="Show sidebar"],
+        button[aria-label="Open sidebar"],
+        button[aria-label="Show sidebar"] {
+          display: flex !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+
+        button[title="Open sidebar"] svg,
+        button[title="Show sidebar"] svg,
+        button[aria-label="Open sidebar"] svg,
+        button[aria-label="Show sidebar"] svg {
+          color: var(--text) !important;
+          fill: var(--text) !important;
+          stroke: var(--text) !important;
+        }
+
+        .sidebar-brand {
+          font-family: "Space Grotesk", sans-serif;
+          font-size: 18px;
+          font-weight: 600;
+          padding: 8px 0 2px 0;
+        }
+
+        .sidebar-sub {
+          color: var(--muted);
+          font-size: 12px;
+          margin-bottom: 16px;
+        }
+
+        .sidebar-section {
+          color: var(--muted);
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          margin: 14px 0 6px 0;
+        }
+
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] span,
+        section[data-testid="stSidebar"] p {
+          color: var(--text);
+        }
+
+        section[data-testid="stSidebar"] input::placeholder {
+          color: var(--muted);
+        }
+
+        section[data-testid="stSidebar"] .sidebar-sub,
+        section[data-testid="stSidebar"] .sidebar-section {
+          color: var(--muted);
+        }
+
+        section[data-testid="stSidebar"] div[role="radiogroup"] > label {
+          background: transparent;
+          border-radius: 10px;
+          padding: 6px 8px;
+          margin-bottom: 4px;
+        }
+
+        section[data-testid="stSidebar"] label[data-baseweb="radio"] > div {
+          border-radius: 10px;
+        }
+
+        section[data-testid="stSidebar"] label[data-baseweb="radio"] input:checked + div {
+          background: var(--accent-soft);
+          border-left: 3px solid var(--accent);
+        }
+
+        /* Cartes / indicateurs */
+        div[data-testid="stMetric"] {
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 14px;
+          padding: 14px 16px;
+          box-shadow: 0 1px 0 rgba(16, 24, 40, 0.04);
+        }
+
+        div[data-testid="stMetric"] label {
+          color: var(--text);
+        }
+
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+          font-size: 22px;
+          font-weight: 600;
+          color: var(--text);
+        }
+
+        div[data-testid="stDataFrame"],
+        div[data-testid="stForm"] {
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 14px;
+          padding: 10px;
+          box-shadow: 0 1px 0 rgba(16, 24, 40, 0.04);
+        }
+
+        div[data-testid="stDataFrame"] {
+          padding: 10px;
+        }
+
+        /* Onglets */
+        div[data-testid="stTabs"] button[role="tab"] {
+          background: #ffffff;
+          margin-top: 10px;
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 8px 16px;
+          margin-right: 6px;
+          color: var(--text);
+          line-height: 1.3;
+          height: auto;
+          min-height: 36px;
+          align-items: center;
+          overflow: visible;
+          display: inline-flex;
+          justify-content: center;
+        }
+
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+          background: var(--accent);
+          color: #ffffff;
+          border-color: var(--accent);
+          box-shadow: 0 4px 10px rgba(255, 122, 0, 0.2);
+        }
+
+        div[data-testid="stTabs"] {
+          overflow: visible;
+        }
+
+        div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+          overflow: visible;
+          padding-bottom: 2px;
+        }
+
+        /* Boutons */
+        button[kind="primary"] {
+          background: var(--accent);
+          border-color: var(--accent);
+          color: #ffffff;
+          border-radius: 10px;
+          padding: 6px 14px;
+        }
+
+        button[kind="primary"]:hover,
+        button[kind="primary"]:active,
+        button[kind="primary"]:focus {
+          background: var(--accent);
+          border-color: var(--accent);
+          color: #ffffff;
+        }
+
+        button[kind="secondary"] {
+          border-radius: 10px;
+          border: 1px solid var(--border);
+        }
+
+        button[kind="secondary"]:hover,
+        button[kind="secondary"]:active,
+        button[kind="secondary"]:focus {
+          border: 1px solid var(--border);
+          background: #ffffff;
+          color: var(--text);
+        }
+
+        /* Champs et formulaires */
+        div[data-baseweb="input"] > div,
+        div[data-baseweb="select"] > div {
+          border-radius: 10px;
+          border-color: var(--border);
+        }
+
+        div[data-baseweb="input"] > div {
+          background: #ffffff !important;
+        }
+
+        div[data-baseweb="select"] > div {
+          background: #ffffff !important;
+        }
+
+        div[data-baseweb="select"] div[role="combobox"] {
+          background: #ffffff !important;
+        }
+
+        /* Listes deroulantes */
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] input {
+          color: var(--text);
+        }
+
+        div[data-baseweb="select"] svg {
+          color: var(--muted);
+        }
+
+        div[data-baseweb="popover"] ul,
+        div[data-baseweb="menu"] ul,
+        ul[role="listbox"] {
+          background: #ffffff;
+          color: var(--text);
+          border: 1px solid var(--border);
+        }
+
+        div[data-baseweb="popover"] li,
+        div[data-baseweb="menu"] li,
+        ul[role="listbox"] li {
+          color: var(--text);
+        }
+
+        div[data-baseweb="select"] [role="option"] {
+          color: var(--text) !important;
+        }
+
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stNumberInput"] input {
+          background: #ffffff;
+        }
+
+        div[data-testid="stForm"] label,
+        div[data-testid="stTextInput"] label,
+        div[data-testid="stNumberInput"] label,
+        div[data-testid="stSelectbox"] label,
+        div[data-testid="stDateInput"] label,
+        div[data-testid="stTextArea"] label,
+        div[data-testid="stRadio"] label,
+        div[data-testid="stCheckbox"] label,
+        div[data-testid="stMultiSelect"] label {
+          color: var(--text) !important;
+        }
+
+        div[data-baseweb="input"] input,
+        div[data-baseweb="textarea"] textarea,
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stNumberInput"] input,
+        div[data-testid="stDateInput"] input {
+          color: var(--text);
+          background: #ffffff !important;
+          caret-color: var(--text);
+        }
+
+        div[data-baseweb="input"] input::placeholder,
+        div[data-baseweb="textarea"] textarea::placeholder {
+          color: var(--muted);
+        }
+
+        div[data-baseweb="select"] * {
+          color: var(--text);
+        }
+
+        button[kind="primary"] {
+          color: #ffffff;
+        }
+
+        button[kind="secondary"] {
+          color: var(--text);
+          background: #ffffff;
+        }
+
+        div[data-testid="stNumberInput"] button {
+          color: #ffffff;
+        }
+
+        div[data-testid="stFormSubmitButton"] button,
+        div[data-testid="stButton"] button {
+          background: #111827;
+          border-color: #111827;
+          color: #ffffff;
+        }
+
+        div[data-testid="stFormSubmitButton"] button:hover,
+        div[data-testid="stFormSubmitButton"] button:active,
+        div[data-testid="stFormSubmitButton"] button:focus,
+        div[data-testid="stButton"] button:hover,
+        div[data-testid="stButton"] button:active,
+        div[data-testid="stButton"] button:focus {
+          background: #111827;
+          border-color: #111827;
+          color: #ffffff;
+        }
+
+        /* Tables (style proche maquette) */
+        div[data-testid="stDataFrame"] thead tr th {
+          background: #f3f5fb !important;
+          color: var(--muted) !important;
+          font-weight: 600 !important;
+          border-bottom: 1px solid var(--border) !important;
+        }
+
+        div[data-testid="stDataFrame"] tbody tr {
+          background: #ffffff !important;
+        }
+
+        div[data-testid="stDataFrame"] tbody tr td {
+          border-bottom: 1px solid var(--border) !important;
+        }
+
+        /* Ventes (mise en page proche maquette) */
+        .breadcrumb {
+          color: var(--muted);
+          font-size: 12px;
+          margin-bottom: 6px;
+        }
+
+        .breadcrumb .active {
+          color: var(--accent);
+          font-weight: 600;
+        }
+
+        .sales-card {
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 16px;
+          box-shadow: 0 1px 0 rgba(16, 24, 40, 0.04);
+          margin-top: 10px;
+        }
+
+        .sales-section-title {
+          font-size: 18px;
+          font-weight: 700;
+          margin: 8px 0 8px 0;
+        }
+
+        .sales-muted {
+          color: var(--muted);
+          font-size: 12px;
+        }
+
+        .inline-pill {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 600;
+          background: var(--pill-blue);
+          color: #2f5cff;
+        }
+
+        /* Radios (Oui / Non) */
+        div[data-testid="stRadio"] label,
+        div[data-testid="stRadio"] span {
+          color: var(--text) !important;
+        }
+
+        div[data-testid="stRadio"] div[role="radiogroup"] > label {
+          color: var(--text) !important;
+          opacity: 1 !important;
+        }
+
+        div[data-testid="stRadio"] * {
+          color: var(--text) !important;
+        }
+
+        /* Checkbox (confirmation suppression) */
+        div[data-testid="stCheckbox"] label,
+        div[data-testid="stCheckbox"] span,
+        div[data-testid="stCheckbox"] p {
+          color: var(--text) !important;
+          opacity: 1 !important;
+        }
+
+        /* Footer (reserve) */
