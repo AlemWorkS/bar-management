@@ -136,12 +136,20 @@ def list_products():
     )
 
 
-def create_product(nom, id_categorie):
+def create_product(
+    nom,
+    id_categorie,
+    prix_achat=0,
+    prix_vente_bouteille=0,
+    prix_vente_verre=0,
+    stock_actuel=0,
+    unite_vente="bouteille",
+):
     """
     Cree un nouveau produit.
 
-    Les champs prix/stock sont initialises a 0 puis enrichis
-    lors des entrees de stock (pages/entries.py).
+    Les parametres optionnels permettent de pre-remplir prix/stock
+    depuis l'UI (page produits, onglet Ajouter).
     """
     exec_query(
         """
@@ -156,7 +164,15 @@ def create_product(nom, id_categorie):
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
-        (nom, id_categorie, 0, 0, 0, 0, "bouteille"),
+        (
+            nom,
+            id_categorie,
+            prix_achat,
+            prix_vente_bouteille,
+            prix_vente_verre,
+            stock_actuel,
+            unite_vente,
+        ),
     )
 
 
@@ -475,6 +491,7 @@ def list_sales(start_date=None, end_date=None, product_id=None, category_id=None
                v.montant,
                v.type_vente,
                v.id_recu,
+               v.id_produit,
                c.libelle AS categorie,
                CASE
                    WHEN v.id_produit IS NOT NULL THEN p.nom_produit
