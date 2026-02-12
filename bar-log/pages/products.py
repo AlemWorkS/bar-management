@@ -405,6 +405,9 @@ def render_products():
                     step=1,
                 )
                 unite_vente = col_right.selectbox("Unite", ["bouteille", "verre"])
+                quantite_ml = st.number_input(
+                    "Quantité contenu en mL", min_value=10, step=1
+                ) # Declarer la quantité contenu dans la bouteille
                 submitted = st.form_submit_button("Ajouter")
 
         # Traitement submit + validation metier.
@@ -425,6 +428,7 @@ def render_products():
                     prix_vente_verre=prix_vente_verre,
                     stock_actuel=stock_initial,
                     unite_vente=unite_vente,
+                    quantite_ml=quantite_ml
                 )
                 st.session_state["product_added"] = True
                 st.rerun()
@@ -468,6 +472,9 @@ def render_products():
                 )
                 st.session_state["edit_stock"] = int(selected_product["stock_actuel"])
                 st.session_state["edit_unite_vente"] = selected_product["unite_vente"]
+                st.session_state["edit_quantite_ml"] = selected_product[
+                        "quantite_ml"
+                    ]
                 st.session_state["edit_categorie_id"] = selected_product["id_categorie"]
                 _sync_edit_price_from_unit()
 
@@ -528,6 +535,11 @@ def render_products():
                             key="edit_unite_vente",
                             width="stretch",
                         )
+                        quantite_ml = st.number_input(
+                            "Quantité en mL",
+                            min_value=0, step=1,
+                            key="edit_quantite_ml",placeholder=0
+                    )
                         submitted = st.form_submit_button(
                             "Mettre a jour",
                             key="edit_submit_btn",
@@ -559,6 +571,7 @@ def render_products():
                             prix_vente_verre,
                             stock_actuel,
                             unite_vente,
+                            quantite_ml
                         )
                         st.session_state["product_updated"] = True
                         st.session_state.pop("edit_loaded_id", None)

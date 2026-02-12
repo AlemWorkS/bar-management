@@ -18,6 +18,10 @@ import streamlit as st
 from data_access import add_sale_stockable, create_receipt, list_categories, list_products, list_sales
 from ui import build_category_map, build_product_map, fmt_fcfa
 
+import pandas as pd
+from decimal import Decimal
+from datetime import date
+import streamlit as st
 
 def _to_decimal(value):
     """Convertit une valeur en Decimal avec fallback robuste."""
@@ -65,35 +69,45 @@ def _icon_for_sale(type_vente):
 
 def _build_history_table_html(sales_df):
     """
-    Construit le HTML du tableau historique.
-
-    Le rendu HTML permet un style proche de la maquette (icones, badges, couleurs).
+    Construit le HTML du tableau historique avec la logique de marge mise à jour.
     """
     rows_html = []
     total_montant = Decimal("0")
     total_marge = Decimal("0")
+    
+    # On transforme le DataFrame en liste de dictionnaires pour itérer proprement
     records = sales_df.to_dict("records")
 
     for row in records:
-        montant = _to_decimal(row.get("montant"))
-        marge = _to_decimal(row.get("marge"))
+        # Extraction et conversion sécurisée des données numériques
+        # Ces colonnes doivent être calculées en amont dans list_sales() ou le repository
+        montant = _to_decimal(row.get("montant") or 0)
+        marge = _to_decimal(row.get("marge") or 0)
+        
         total_montant += montant
         total_marge += marge
 
+        # Nettoyage des textes pour le HTML
         article = escape(str(row.get("article") or "-"))
-        categorie = str(row.get("categorie") or "Sans categorie")
+        categorie = str(row.get("categorie") or "Sans catégorie")
         categorie_safe = escape(categorie)
         badge_class = _category_color_class(categorie)
 
+        # Identifiants et dates
         id_value = row.get("id_produit") or row.get("id_vente") or "-"
         id_text = escape(str(id_value))
         date_text = escape(str(row.get("date_vente") or ""))
         qty_text = escape(str(row.get("quantite") or 0))
-        type_vente = str(row.get("type_vente") or "")
+        
+        # Type de vente (verre / bouteille)
+        type_vente = str(row.get("type_vente") or "").lower()
         type_text = escape(type_vente.title() if type_vente else "-")
+        
+        # Formatage monétaire
         montant_text = escape(_fmt_fcfa_compact(montant))
         marge_text = escape(_fmt_signed_fcfa(marge))
 
+        # Gestion des icônes et couleurs de marge
         icon_name, icon_color_class = _icon_for_sale(type_vente)
         marge_class = "sales-marge-positive" if marge >= 0 else "sales-marge-negative"
 
@@ -123,8 +137,9 @@ def _build_history_table_html(sales_df):
             ).strip()
         )
 
+    # Calcul des totaux pour le footer
     total_marge_class = "sales-marge-positive" if total_marge >= 0 else "sales-marge-negative"
-    count_text = f"Affichage de 1 a {len(records)} sur {len(records)} resultats"
+    count_text = f"Affichage de 1 à {len(records)} sur {len(records)} résultats"
 
     return dedent(
         f"""
@@ -135,8 +150,8 @@ def _build_history_table_html(sales_df):
                 <tr>
                   <th>Date</th>
                   <th>Produit</th>
-                  <th>Categorie</th>
-                  <th class="sales-col-center">Qte</th>
+                  <th>Catégorie</th>
+                  <th class="sales-col-center">Qté</th>
                   <th>Type</th>
                   <th class="sales-col-right">Montant</th>
                   <th class="sales-col-right">Marge</th>
@@ -147,9 +162,9 @@ def _build_history_table_html(sales_df):
               </tbody>
               <tfoot>
                 <tr>
-                  <td colspan="5" class="sales-col-right">Total journee:</td>
-                  <td class="sales-col-right">{escape(_fmt_fcfa_compact(total_montant))}</td>
-                  <td class="sales-col-right {total_marge_class}">{escape(_fmt_signed_fcfa(total_marge))}</td>
+                  <td colspan="5" class="sales-col-right">Total période:</td>
+                  <td class="sales-col-right"><strong>{escape(_fmt_fcfa_compact(total_montant))}</strong></td>
+                  <td class="sales-col-right {total_marge_class}"><strong>{escape(_fmt_signed_fcfa(total_marge))}</strong></td>
                 </tr>
               </tfoot>
             </table>
@@ -158,7 +173,6 @@ def _build_history_table_html(sales_df):
         </div>
         """
     ).strip()
-
 
 def render_sales():
     """Rend la page ventes (saisie + historique)."""
@@ -268,7 +282,7 @@ def render_sales():
             prix_unitaire = 0.0
 
         with entry_cols[3]:
-            st.session_state["sale_unite_display"] = unite_vente
+            #st.session_state["sale_unite_display"] = unite_vente
             st.selectbox(
                 "Unite",
                 ["bouteille", "verre"],
@@ -317,52 +331,95 @@ def render_sales():
             )
             st.session_state["sale_reset"] = True
             st.rerun()
-
+# --- PRÉPARATION DES DONNÉES ---
     receipt_items = st.session_state["receipt_items"]
     product_lookup = {row["id_produit"]: row for row in products_df.to_dict("records")}
+    category_labels = build_category_map(categories_df) # Pour le nom des catégories
+    
+    display_items = []
     draft_total = Decimal("0")
     draft_marge = Decimal("0")
+
+    # --- LOGIQUE DE CALCUL STRICTE DU CODE 2 ---
     for item in receipt_items:
         product = product_lookup.get(item["product_id"])
         if not product:
             continue
-        prix_achat = _to_decimal(product.get("prix_achat"))
-        if item["unite_vente"] == "verre":
-            prix_vente = _to_decimal(product.get("prix_vente_verre"))
-        else:
-            prix_vente = _to_decimal(product.get("prix_vente_bouteille"))
-        qty = _to_decimal(item["quantite"])
-        draft_total += prix_vente * qty
-        draft_marge += (prix_vente - prix_achat) * qty
 
+        # Données de base (Conversion Decimal pour la précision financière)
+        prix_achat_btl = _to_decimal(product.get("prix_achat"))
+        prix_vente_btl = _to_decimal(product.get("prix_vente_bouteille"))
+        prix_vente_reel_verre = _to_decimal(product.get("prix_vente_verre"))
+        quantite_btl_ml = int(product.get("quantite_ml") or 1)
+        verre_de_mesure_ml = 50 
+        qty = _to_decimal(item["quantite"])
+
+        # Initialisation des variables de calcul
+        prix_vente_moyen_verre = Decimal("0")
+        montant_vente = Decimal("0")
+        montant_moyen_vente_verre = Decimal("0")
+        marge_ligne = Decimal("0")
+
+        if item["unite_vente"] == "verre":
+            # Calcul du rendement (Combien de verres dans une bouteille)
+            nombre_verre_total_moyen = Decimal(quantite_btl_ml) / Decimal(verre_de_mesure_ml)
+            # Prix "théorique" d'un verre s'il était vendu au prix bouteille
+            prix_vente_moyen_verre = (prix_vente_btl / nombre_verre_total_moyen).quantize(Decimal("0.01"))
+            
+            montant_vente = (prix_vente_reel_verre * qty).quantize(Decimal("0.01"))
+            montant_moyen_vente_verre = (prix_vente_moyen_verre * qty).quantize(Decimal("0.01"))
+            
+            # La marge est la différence entre le prix verre réel et le prix moyen bouteille
+            marge_ligne = montant_vente - montant_moyen_vente_verre
+        else:
+            # Calcul pour la bouteille entière
+            montant_vente = (prix_vente_btl * qty).quantize(Decimal("0.01"))
+            marge_ligne = montant_vente - (prix_achat_btl * qty).quantize(Decimal("0.01"))
+
+        # Mise à jour des totaux de la session
+        draft_total += montant_vente
+        draft_marge += marge_ligne
+
+        # Construction de la ligne pour le tableau d'affichage (Colonnes du Code 2)
+        display_items.append({
+            "Produit": product.get("nom_produit", "Inconnu"),
+            "Categorie": category_labels.get(product.get("id_categorie"), {}).get("nom_categorie", ""),
+            "Quantite": float(qty),
+            "Unite": item["unite_vente"],
+            "Prix d'achat bouteille": float(prix_achat_btl),
+            "Prix de vente bouteille": float(prix_vente_btl),
+            "Prix de vente verre": float(prix_vente_reel_verre),
+            "Prix de vente moyen verre": float(prix_vente_moyen_verre),
+            "Montant vente": float(montant_vente),
+            "Marge": float(marge_ligne),
+        })
+
+    # --- AFFICHAGE DU TABLEAU DÉTAILLÉ (EXTRAIT DU CODE 2) ---
+    if display_items:
+        table_df = pd.DataFrame(display_items)
+        st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+    # --- BARRE D'ACTIONS ET RÉSUMÉ (STYLE CODE 1) ---
     summary_cols = st.columns([1.2, 1.2, 4], vertical_alignment="center")
+    
     with summary_cols[0]:
-        save_clicked = st.button(
-            "Enregistrer",
-            key="sale_save_btn",
-            use_container_width=True,
-            disabled=not receipt_items,
-        )
+        save_clicked = st.button("Enregistrer", key="sale_save_btn", use_container_width=True, disabled=not receipt_items)
+        
     with summary_cols[1]:
-        clear_clicked = st.button(
-            "Vider",
-            key="sale_clear_btn",
-            use_container_width=True,
-            disabled=not receipt_items,
-        )
+        clear_clicked = st.button("Vider", key="sale_clear_btn", use_container_width=True, disabled=not receipt_items)
+        
     with summary_cols[2]:
         if receipt_items:
             st.markdown(
-                (
-                    "<div class='sales-draft-summary'>"
-                    f"{len(receipt_items)} ligne(s) en attente - "
-                    f"Total: <strong>{fmt_fcfa(draft_total)}</strong> - "
-                    f"Marge estimee: <strong>{fmt_fcfa(draft_marge)}</strong>"
-                    "</div>"
-                ),
-                unsafe_allow_html=True,
+                f"<div class='sales-draft-summary'>"
+                f"{len(receipt_items)} ligne(s) en attente - "
+                f"Total: <strong>{fmt_fcfa(draft_total)}</strong> - "
+                f"Marge estimée: <strong>{fmt_fcfa(draft_marge)}</strong>"
+                f"</div>",
+                unsafe_allow_html=True
             )
 
+    # --- LOGIQUE BOUTONS ---
     if clear_clicked:
         st.session_state["receipt_items"] = []
         st.rerun()
@@ -378,61 +435,37 @@ def render_sales():
                     item["unite_vente"],
                     receipt_id,
                 )
-        except Exception as exc:
-            st.error(f"Enregistrement impossible: {exc}")
-        else:
             st.session_state["receipt_items"] = []
             st.session_state["sale_reset"] = True
-            st.success("Ventes enregistrees")
+            st.success("Ventes enregistrées")
             st.rerun()
+        except Exception as exc:
+            st.error(f"Enregistrement impossible: {exc}")
 
+    # --- SECTION HISTORIQUE (STYLE CODE 1) ---
     st.markdown(
-        (
-            "<div class='sales-history-head'>"
-            "<span class='material-symbols-outlined'>history</span>"
-            "<span>Historique</span>"
-            "</div>"
-        ),
-        unsafe_allow_html=True,
+        "<div class='sales-history-head'>"
+        "<span class='material-symbols-outlined'>history</span>"
+        "<span>Historique</span>"
+        "</div>",
+        unsafe_allow_html=True
     )
 
     category_map = build_category_map(categories_df)
     default_start = date.today().replace(day=1)
     default_end = date.today()
-    if not all_sales_df.empty and "date_vente" in all_sales_df.columns:
-        default_start_value = all_sales_df["date_vente"].min()
-        default_end_value = all_sales_df["date_vente"].max()
-        default_start = (
-            default_start_value.date()
-            if hasattr(default_start_value, "date")
-            else default_start_value
-        )
-        default_end = (
-            default_end_value.date()
-            if hasattr(default_end_value, "date")
-            else default_end_value
-        )
 
     filter_cols = st.columns([1.4, 1.4, 1.8], vertical_alignment="bottom")
-    start_date = filter_cols[0].date_input(
-        "Periode debut",
-        value=default_start,
-        key="vente_start",
-    )
-    end_date = filter_cols[1].date_input("Periode fin", value=default_end, key="vente_end")
+    start_date = filter_cols[0].date_input("Période début", value=default_start, key="vente_start")
+    end_date = filter_cols[1].date_input("Période fin", value=default_end, key="vente_end")
     category_filter = filter_cols[2].selectbox(
-        "Categorie",
-        ["Toutes categories"] + list(category_map.keys()),
-        key="vente_category",
+        "Catégorie", ["Toutes catégories"] + list(category_map.keys()), key="vente_category"
     )
 
-    category_id = None
-    if category_filter != "Toutes categories":
-        category_id = category_map[category_filter]["id_categorie"]
+    category_id = category_map[category_filter]["id_categorie"] if category_filter != "Toutes catégories" else None
 
     sales_df = list_sales(start_date, end_date, None, category_id)
     if sales_df.empty:
-        st.info("Aucune vente sur la periode")
-        return
-
-    st.markdown(_build_history_table_html(sales_df), unsafe_allow_html=True)
+        st.info("Aucune vente sur la période")
+    else:
+        st.markdown(_build_history_table_html(sales_df), unsafe_allow_html=True)

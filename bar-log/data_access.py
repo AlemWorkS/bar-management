@@ -128,7 +128,8 @@ def list_products():
                p.prix_vente_verre,
                p.stock_actuel,
                p.unite_vente,
-               p.id_categorie
+               p.id_categorie,
+               p.quantite_ml
         FROM produit p
         JOIN categorie c ON p.id_categorie = c.id_categorie
         ORDER BY p.nom_produit
@@ -144,6 +145,7 @@ def create_product(
     prix_vente_verre=0,
     stock_actuel=0,
     unite_vente="bouteille",
+    quantite_ml=0
 ):
     """
     Cree un nouveau produit.
@@ -160,9 +162,10 @@ def create_product(
             prix_vente_bouteille,
             prix_vente_verre,
             stock_actuel,
-            unite_vente
+            unite_vente,
+            quantite_ml
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             nom,
@@ -172,6 +175,7 @@ def create_product(
             prix_vente_verre,
             stock_actuel,
             unite_vente,
+            quantite_ml
         ),
     )
 
@@ -185,6 +189,7 @@ def update_product(
     prix_vente_verre,
     stock_actuel,
     unite_vente,
+    quantite_ml
 ):
     """
     Met a jour un produit.
@@ -200,7 +205,8 @@ def update_product(
             prix_vente_bouteille = %s,
             prix_vente_verre = %s,
             stock_actuel = %s,
-            unite_vente = %s
+            unite_vente = %s,
+            quantite_ml = %s
         WHERE id_produit = %s
         """,
         (
@@ -211,6 +217,7 @@ def update_product(
             prix_vente_verre,
             stock_actuel,
             unite_vente,
+            quantite_ml,
             product_id,
         ),
     )
@@ -479,9 +486,8 @@ def list_entries(start_date=None, end_date=None, product_id=None):
 
 def list_sales(start_date=None, end_date=None, product_id=None, category_id=None):
     """
-    Retourne l'historique des ventes avec filtres optionnels.
-
-    Utilisee par pages/sales.py (bloc Historique).
+    Retourne l'historique des ventes avec un calcul de marge intelligent 
+    (rendement pour les verres vs coût d'achat pour les bouteilles).
     """
     query = (
         """
@@ -497,7 +503,16 @@ def list_sales(start_date=None, end_date=None, product_id=None, category_id=None
                    WHEN v.id_produit IS NOT NULL THEN p.nom_produit
                    ELSE v.nom_preparation
                END AS article,
-               (v.montant - COALESCE(p.prix_achat, 0) * v.quantite) AS marge
+               -- CALCUL DE LA MARGE CORRIGÉ
+               CASE 
+                   -- Si c'est un verre : Marge = Montant - (Prix Bouteille / Nombre de verres possibles)
+                   WHEN v.type_vente = 'verre' AND p.id_produit IS NOT NULL AND COALESCE(p.quantite_ml, 0) > 0 THEN 
+                       v.montant - ((p.prix_vente_bouteille / (CAST(p.quantite_ml AS FLOAT) / 50.0)) * v.quantite)
+                   
+                   -- Si c'est une bouteille ou une préparation : Marge = Montant - (Prix Achat * Quantité)
+                   ELSE 
+                       v.montant - (COALESCE(p.prix_achat, 0) * v.quantite)
+               END AS marge
         FROM vente v
         JOIN categorie c ON v.id_categorie = c.id_categorie
         LEFT JOIN produit p ON v.id_produit = p.id_produit
@@ -517,11 +532,12 @@ def list_sales(start_date=None, end_date=None, product_id=None, category_id=None
     if category_id:
         filters.append("v.id_categorie = %s")
         params.append(category_id)
+    
     if filters:
         query += " WHERE " + " AND ".join(filters)
+    
     query += " ORDER BY v.date_vente DESC, v.id_vente DESC"
     return fetch_df(query, params)
-
 
 def list_charges(start_date=None, end_date=None):
     """
