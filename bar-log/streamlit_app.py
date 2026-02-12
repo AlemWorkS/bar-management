@@ -607,8 +607,8 @@ def list_products():
                p.prix_vente_verre,
                p.stock_actuel,
                p.unite_vente,
-               p.verres_par_bouteille,
-               p.id_categorie
+               p.id_categorie,
+               p.quantite_ml
         FROM produit p
         JOIN categorie c ON p.id_categorie = c.id_categorie
         ORDER BY p.nom_produit
@@ -616,7 +616,7 @@ def list_products():
     )
 
 
-def create_product(nom, id_categorie, verres_par_bouteille):
+def create_product(nom, id_categorie, mesure):
     exec_query(
         """
         INSERT INTO produit (
@@ -627,11 +627,11 @@ def create_product(nom, id_categorie, verres_par_bouteille):
             prix_vente_verre,
             stock_actuel,
             unite_vente,
-            verres_par_bouteille
+            quantite_ml
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (nom, id_categorie, 0, 0, 0, 0, "bouteille", verres_par_bouteille),
+        (nom, id_categorie, 0, 0, 0, 0, "bouteille", mesure),
     )
 
 
@@ -644,6 +644,7 @@ def update_product(
     prix_vente_verre,
     stock_actuel,
     unite_vente,
+    quantite_ml
 ):
     exec_query(
         """
@@ -654,7 +655,8 @@ def update_product(
             prix_vente_bouteille = %s,
             prix_vente_verre = %s,
             stock_actuel = %s,
-            unite_vente = %s
+            unite_vente = %s,
+            quantite_ml = %s
         WHERE id_produit = %s
         """,
         (
@@ -666,8 +668,59 @@ def update_product(
             stock_actuel,
             unite_vente,
             product_id,
+            quantite_ml
         ),
     )
+
+# OPERATION TABLE VERRE_DE_MESURE
+
+
+def list_verres():
+    return fetch_df(
+        """
+        SELECT v.id,
+               v.libelle,
+               v.mesure
+        FROM verre_de_mesure v
+        """
+    )
+
+
+def create_verre(libelle, description):
+    exec_query(
+        """
+        INSERT INTO verre_de_mesure (
+            libelle,
+            description
+            
+        )
+        VALUES (%s, %s)
+        """,
+        (libelle,description),
+    )
+
+
+def update_verre(
+    id,
+    libelle,
+    description,
+    
+):
+    exec_query(
+        """
+        UPDATE verre_de_mesure
+        SET libelle = %s,
+            description = %s
+        WHERE id = %s
+        """,
+        (
+            id,
+            libelle,
+            description
+            
+        ),
+    )
+
 
 
 def delete_product(product_id):
@@ -1090,6 +1143,7 @@ def render_products():
                 "prix_vente_verre": "Prix vente verre",
                 "stock_actuel": "Stock actuel",
                 "unite_vente": "Unite vente",
+                "quantite_ml": "Quantité en mL"
             }
         )
         show_dataframe(display_df, "Aucun produit")
@@ -1110,9 +1164,9 @@ def render_products():
             else:
                 nom = st.text_input("Nom du produit")
                 categorie_key = st.selectbox("Catégorie", category_keys)
-                verres_par_bouteille = st.number_input(
-                    "Nombre de verres par bouteille", min_value=1, step=1
-                )
+                quantite_ml = st.number_input(
+                    "Quantité contenu en mL", min_value=10, step=1
+                ) # Declarer la quantité contenu dans la bouteille
                 submitted = st.form_submit_button("Ajouter")
         if submitted:
             if categories_df.empty:
@@ -1121,7 +1175,7 @@ def render_products():
                 st.error("Nom du produit requis")
             else:
                 category = category_map[categorie_key]
-                create_product(nom, category["id_categorie"], verres_par_bouteille)
+                create_product(nom, category["id_categorie"], quantite_ml) # Enregistrer le produit
                 st.session_state["product_added"] = True
                 st.rerun()
 
