@@ -38,4 +38,6 @@ Acces via navigateur, mise a jour simple, deploiement possible sur Streamlit Clo
 
 d:\bar-log\.venv\Scripts\python.exe -m streamlit run d:\bar-log\streamlit_app.py-- commande que j'utilisais en local pour lancer
 
-C:\github\bar-management\bar-log\.venv\Scripts\python.exe -m streamlit run d:\bar-log\streamlit_app.py -- commande pour lancer tu remplace juste par ton chemin à toi au début
+cd C:\github\bar-management\bar-log
+.\.venv\Scripts\python.exe -m streamlit run streamlit_app.py
+
