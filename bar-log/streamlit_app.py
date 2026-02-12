@@ -667,8 +667,9 @@ def update_product(
             prix_vente_verre,
             stock_actuel,
             unite_vente,
-            product_id,
-            quantite_ml
+            quantite_ml,
+            product_id
+            
         ),
     )
 
@@ -938,7 +939,7 @@ def list_sales(start_date=None, end_date=None, product_id=None, category_id=None
                END AS article,
                CASE
                    WHEN v.type_vente = 'verre' THEN 
-                       (v.montant - (COALESCE(p.prix_achat, 0) / NULLIF(p.verres_par_bouteille, 0) * v.quantite))
+                       (v.montant - (COALESCE(p.prix_achat, 0) / NULLIF(6, 0) * v.quantite))
                    ELSE
                        (v.montant - COALESCE(p.prix_achat, 0) * v.quantite)
                END AS marge
@@ -1181,7 +1182,7 @@ def render_products():
 
     with tab_edit:
         if products_df.empty or categories_df.empty:
-            st.info("Aucun produit a modifier")
+            st.info("Aucun produit à modifier")
         else:
             if st.session_state.get("product_updated"):
                 st.success("Produit modifie")
@@ -1210,6 +1211,9 @@ def render_products():
                     st.session_state["edit_unite_vente"] = selected_product[
                         "unite_vente"
                     ]
+                    st.session_state["edit_quantite_ml"] = selected_product[
+                        "quantite_ml"
+                    ]
                     st.session_state["edit_categorie_id"] = selected_product[
                         "id_categorie"
                     ]
@@ -1233,25 +1237,30 @@ def render_products():
                         "Categorie", category_keys, index=cat_index
                     )
                     prix_achat = st.number_input(
-                        "Prix achat", min_value=0.0, step=0.01,
+                        "Prix achat", min_value=0.0, step=0.01,placeholder=0.0,
                         key="edit_prix_achat",
                     )
                     prix_vente_bouteille = st.number_input(
                         "Prix vente bouteille", min_value=0.0, step=0.01,
-                        key="edit_prix_vente_bouteille",
+                        key="edit_prix_vente_bouteille",placeholder=0.0
                     )
                     prix_vente_verre = st.number_input(
-                        "Prix vente verre", min_value=0.0, step=0.01,
-                        key="edit_prix_vente_verre",
-                    )
+                        "Prix vente par verre de 50mL", min_value=0.0, step=0.01,
+                        key="edit_prix_vente_verre",placeholder=0.0
+                    ) # Declaration du prix de vente par unité de 50mL
                     stock_actuel = st.number_input(
                         "Stock actuel", min_value=0, step=1,
-                        key="edit_stock",
+                        key="edit_stock",placeholder=0
                     )
                     unite_vente = st.selectbox(
                         "Unite de vente",
                         ["bouteille", "verre"],
                         key="edit_unite_vente",
+                    )
+                    quantite_ml = st.number_input(
+                        "Quantité en mL",
+                         min_value=0, step=1,
+                        key="edit_quantite_ml",placeholder=0
                     )
                     submitted = st.form_submit_button("Mettre a jour")
                 if submitted:
@@ -1268,6 +1277,7 @@ def render_products():
                             prix_vente_verre,
                             stock_actuel,
                             unite_vente,
+                            quantite_ml
                         )
                         st.session_state["product_updated"] = True
                         st.session_state.pop("edit_loaded_id", None)
@@ -1497,33 +1507,35 @@ def render_sales():
         product = product_lookup.get(item["product_id"])
         prix_achat_btl = Decimal(str(product.get("prix_achat") or 0))
         prix_vente_btl = Decimal(str(product.get("prix_vente_bouteille") or 0))
+        prix_vente_reel_verre = Decimal(str(product.get("prix_vente_verre") or 0))
         marge_ligne = Decimal("0")
         prix_vente = 0
 
+        # CALCUL MARGE
+
+        verre_de_mesure_ml = int(50)
+        quantite_btl_ml = int(str(product.get("quantite_ml")) or 1)
+        nombre_verre_total_moyen = int(quantite_btl_ml/verre_de_mesure_ml)
+        # Le coût d'un seul verre est le prix d'achat bouteille divisé par le rendement
+        prix_vente_moyen_verre = (prix_vente_btl / nombre_verre_total_moyen).quantize(Decimal("0.01"))
+
+        quantite = Decimal(item["quantite"])
+
+        montant_vente = (prix_vente_reel_verre * quantite).quantize(Decimal("0.01"))
+        montant_moyen_vente_verre = (prix_vente_moyen_verre * quantite).quantize(Decimal("0.01"))
+
+            
         if item["unite_vente"] == "verre":
-            verres_par_btl = int(str(product.get("verres_par_bouteille")) or 1)
-            prix_vente_unitaire_verre = Decimal(str(product.get("prix_vente_verre") or 0))
-            prix_vente = prix_vente_unitaire_verre
-            # Le coût d'un seul verre est le prix d'achat bouteille divisé par le rendement
-            estimation_prix_achat_unitaire_verre = (prix_achat_btl / verres_par_btl).quantize(Decimal("0.01"))
-
-            quantite = Decimal(item["quantite"])
-
-            cout_total_vente = (prix_vente * quantite).quantize(Decimal("0.01"))
-            estimation_cout_total_achat_verre = (estimation_prix_achat_unitaire_verre * quantite).quantize(Decimal("0.01"))
-            
-            
-            marge_ligne = cout_total_vente - estimation_cout_total_achat_verre
+            marge_ligne = montant_vente - montant_moyen_vente_verre
 
         else:
-            prix_vente = prix_vente_btl
-            cout_total_vente = (prix_vente * Decimal(item["quantite"])).quantize(Decimal("0.01"))
-            marge_ligne = cout_total_vente - (prix_achat_btl * item["quantite"])
+            montant_vente = (prix_vente * Decimal(item["quantite"])).quantize(Decimal("0.01"))
+            marge_ligne = montant_vente - (prix_achat_btl * item["quantite"])
 
 
         # Calculs finaux pour le tableau
         
-        total_all += cout_total_vente
+        total_all += montant_vente
         article = product["nom_produit"] if product else item["product_label"]
         categorie = category_labels.get(product.get("id_categorie"), "")
 
@@ -1532,14 +1544,18 @@ def render_sales():
                 "Produit": article,
                 "Categorie": categorie,
                 "Quantite": item["quantite"],
-                "Prix de vente": float(prix_vente),
-                "Prix d'achat": float(prix_achat_btl),
+                "Prix d'achat bouteille": float(prix_achat_btl),
+                "Prix de vente bouteille": float(prix_vente_btl),
+                "Prix de vente verre": float(prix_vente_reel_verre),
+                "Prix de vente moyen verre": float(prix_vente_moyen_verre),
                 "Unite": item["unite_vente"],
-                "Montant": float(cout_total_vente),
+                "Montant vente": float(montant_vente),
+                "Montant moyen vente": float(montant_moyen_vente_verre),
+
                 "Marge": float(marge_ligne), # Nouvelle colonne
             }
         )
-        total_montant += cout_total_vente
+        total_montant += montant_vente
         total_quantite += item["quantite"]
 
     if display_items:
@@ -1547,11 +1563,14 @@ def render_sales():
             {
                 "Produit": "Total du jour",
                 "Categorie": "",
-                "Quantite": total_quantite,
-                "Prix d'achat": float(prix_achat_btl),
-                "Prix de vente": float(prix_vente),
+                "Quantite": "",
+                "Prix d'achat bouteille": "",
+                "Prix de vente bouteille" : "",
+                "Prix de vente verre" : "",
+                "Prix de vente moyen verre": "",
                 "Unite": "",
-                "Montant": float(total_montant),
+                "Montant vente": float(total_montant),
+                "Montant moyen vente" : "",
                 "Marge": float(marge_ligne)
             }
         )
@@ -1561,10 +1580,13 @@ def render_sales():
             "Produit",
             "Categorie",
             "Quantite",
-            "Prix d'achat",
-            "Prix de vente",
+            "Prix d'achat bouteille",
+            "Prix de vente bouteille",
+            "Prix de vente verre",
+            "Prix de vente moyen verre",
             "Unite",
-            "Montant",
+            "Montant vente",
+            "Montant moyen vente",
             "Marge",
         ],
     )

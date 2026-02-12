@@ -1,0 +1,5 @@
+Faudra ajouter un truc dans ta bd.
+Au niveau de la table produit faut faire :
+
+- ALTER TABLE `produit` ADD `quantite_ml` INT NOT NULL;
+
